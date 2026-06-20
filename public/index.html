@@ -76,7 +76,7 @@
           <label id="logo-dropzone" class="logo-upload" for="restaurant-logo">
             <input id="restaurant-logo" name="logo" type="file" accept="image/png,image/jpeg,image/webp" />
             <span id="logo-preview" class="logo-preview"><strong>+</strong></span>
-            <span class="upload-copy"><strong>Escolher uma imagem</strong><small>JPG, PNG ou WebP, até 5 MB</small></span>
+            <span class="upload-copy"><strong id="logo-upload-title">Escolher uma imagem</strong><small id="logo-upload-hint">JPG, PNG ou WebP, até 10 MB. Otimizamos antes do envio.</small></span>
           </label>
 
           <p id="form-error" class="form-error hidden" role="alert"></p>
@@ -85,14 +85,148 @@
       </div>
     </section>
 
-    <section id="success-view" class="centered-view hidden">
+    <section id="categories-view" class="onboarding-layout hidden">
+      <aside class="onboarding-aside">
+        <span class="eyebrow">Configuração inicial</span>
+        <h1>Organize seu cardápio.</h1>
+        <p>Crie categorias para seus clientes encontrarem os produtos com facilidade.</p>
+        <div class="steps">
+          <div class="step complete"><span>✓</span><div><strong>Identidade</strong><small>Nome e logo</small></div></div>
+          <div class="step active"><span>2</span><div><strong>Categorias</strong><small>Organize o cardápio</small></div></div>
+          <div class="step"><span>3</span><div><strong>Itens</strong><small>Cadastre seus produtos</small></div></div>
+        </div>
+      </aside>
+
+      <div class="form-panel categories-panel">
+        <div class="form-heading">
+          <span class="step-label">PASSO 2 DE 3</span>
+          <h2>Adicione as categorias</h2>
+          <p>Exemplos: Hambúrgueres, Combos, Bebidas e Sobremesas.</p>
+        </div>
+
+        <form id="category-form" class="category-form">
+          <label for="category-name">Nome da categoria</label>
+          <div class="category-input-row">
+            <input id="category-name" name="name" type="text" minlength="2" maxlength="60" placeholder="Ex: Hambúrgueres" required />
+            <button id="category-submit" class="button button-primary" type="submit">Adicionar</button>
+          </div>
+          <p id="category-error" class="form-error hidden" role="alert"></p>
+        </form>
+
+        <div class="category-section-heading">
+          <strong>Suas categorias</strong>
+          <span id="category-count">0 categorias</span>
+        </div>
+        <div id="category-empty" class="category-empty">
+          <span>+</span>
+          <p>Nenhuma categoria adicionada ainda.</p>
+        </div>
+        <div id="category-list" class="category-list"></div>
+
+        <button id="categories-continue" class="button button-primary" type="button" disabled>Continuar para itens <span>→</span></button>
+      </div>
+    </section>
+
+    <section id="items-view" class="onboarding-layout hidden">
+      <aside class="onboarding-aside">
+        <span class="eyebrow">Configuração inicial</span>
+        <h1>Monte seu cardápio.</h1>
+        <p>Cadastre os produtos com informações claras e uma boa foto.</p>
+        <div class="steps">
+          <div class="step complete"><span>✓</span><div><strong>Identidade</strong><small>Nome e logo</small></div></div>
+          <div class="step complete"><span>✓</span><div><strong>Categorias</strong><small>Organize o cardápio</small></div></div>
+          <div class="step active"><span>3</span><div><strong>Itens</strong><small>Cadastre seus produtos</small></div></div>
+        </div>
+      </aside>
+
+      <div class="form-panel items-panel">
+        <div class="form-heading items-heading">
+          <div>
+            <span class="step-label">PASSO 3 DE 3</span>
+            <h2>Adicione os produtos</h2>
+            <p>Você poderá editar preços e disponibilidade depois.</p>
+          </div>
+          <button id="items-back" class="button button-ghost compact-button" type="button">← Categorias</button>
+        </div>
+
+        <form id="product-form" class="product-form">
+          <div class="product-fields-row">
+            <div class="field-group field-grow">
+              <label for="product-name">Nome do produto</label>
+              <input id="product-name" name="name" type="text" minlength="2" maxlength="100" placeholder="Ex: Oba Bacon" required />
+            </div>
+            <div class="field-group price-field">
+              <label for="product-price">Preço</label>
+              <div class="price-input"><span>R$</span><input id="product-price" name="price" type="text" inputmode="decimal" placeholder="29,90" required /></div>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="product-category">Categoria</label>
+            <select id="product-category" name="category" required></select>
+          </div>
+
+          <div class="field-group">
+            <label for="product-description">Descrição <span class="optional">opcional</span></label>
+            <textarea id="product-description" name="description" maxlength="500" rows="3" placeholder="Ingredientes e detalhes do produto"></textarea>
+          </div>
+
+          <div class="field-group">
+            <label>Foto do produto <span class="optional">opcional</span></label>
+            <label class="logo-upload product-upload" for="product-image">
+              <input id="product-image" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
+              <span id="product-image-preview" class="logo-preview product-image-preview"><strong>+</strong></span>
+              <span class="upload-copy"><strong id="product-upload-title">Escolher uma imagem</strong><small id="product-upload-hint">JPG, PNG ou WebP, até 10 MB. Otimizamos antes do envio.</small></span>
+            </label>
+          </div>
+
+          <p id="product-error" class="form-error hidden" role="alert"></p>
+          <button id="product-submit" class="button button-primary" type="submit">Adicionar produto</button>
+        </form>
+
+        <div class="category-section-heading product-section-heading">
+          <strong>Produtos cadastrados</strong>
+          <span id="product-count">0 produtos</span>
+        </div>
+        <div id="product-empty" class="category-empty">
+          <span>+</span>
+          <p>Nenhum produto cadastrado ainda.</p>
+        </div>
+        <div id="product-list" class="product-list"></div>
+
+        <button id="finish-menu" class="button button-primary" type="button" disabled>Concluir cardápio <span>→</span></button>
+      </div>
+    </section>
+
+    <section id="complete-view" class="centered-view hidden">
       <div class="success-card">
         <span class="success-check">✓</span>
-        <span class="eyebrow">Restaurante criado</span>
-        <h1 id="success-title">Seu espaço está pronto.</h1>
-        <p>A próxima etapa será organizar as categorias e cadastrar os itens do cardápio.</p>
-        <button class="button button-primary" type="button" disabled>Categorias em breve</button>
+        <span class="eyebrow">Configuração concluída</span>
+        <h1>Seu cardápio ganhou forma.</h1>
+        <p>Restaurante, categorias e produtos foram salvos. Publique para gerar o link que seus clientes poderão acessar.</p>
+        <p id="publish-error" class="form-error hidden" role="alert"></p>
+        <button id="publish-menu" class="button button-primary" type="button">Publicar cardápio</button>
+        <div id="share-panel" class="share-panel hidden">
+          <label for="public-menu-url">Link público</label>
+          <div class="share-row">
+            <input id="public-menu-url" type="text" readonly />
+            <button id="copy-menu-url" class="button button-copy" type="button">Copiar</button>
+          </div>
+          <a id="open-public-menu" class="button button-primary" href="#" target="_blank" rel="noopener">Abrir cardápio</a>
+        </div>
       </div>
+    </section>
+
+    <section id="public-menu-view" class="public-menu-view hidden">
+      <header class="menu-hero">
+        <img id="public-restaurant-logo" class="public-restaurant-logo hidden" alt="" />
+        <span class="eyebrow">Cardápio digital</span>
+        <h1 id="public-restaurant-name"></h1>
+        <p>Escolha seus favoritos.</p>
+      </header>
+      <nav id="public-category-nav" class="public-category-nav" aria-label="Categorias"></nav>
+      <div id="public-menu-content" class="public-menu-content"></div>
+      <footer class="public-menu-footer">Feito com <strong>Shack Menu</strong></footer>
     </section>
   </main>
 

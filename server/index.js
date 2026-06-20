@@ -3,9 +3,8 @@ import "dotenv/config";
 import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { createClient } from "@supabase/supabase-js";
 import express from "express";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,20 +47,35 @@ async function authenticate(request, response, next) {
     return response.status(401).json({ error: "Sessão inválida." });
   }
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data, error } = await supabase.auth.getUser(token);
+  try {
+    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  if (error || !data.user) {
-    return response.status(401).json({ error: "Sessão expirada." });
+    if (!authResponse.ok) {
+      return response.status(401).json({ error: "Sessão expirada. Entre novamente com o Google." });
+    }
+
+    const user = await authResponse.json();
+    if (!user.id) {
+      return response.status(401).json({ error: "Sessão inválida." });
+    }
+
+    request.user = user;
+    return next();
+  } catch (error) {
+    console.error("Could not validate Supabase session", error);
+    return response.status(503).json({
+      error: "Não foi possível validar sua sessão com o Supabase. Tente novamente.",
+    });
   }
-
-  request.user = data.user;
-  return next();
 }
 
-app.post("/api/uploads/logo", authenticate, async (request, response) => {
+function createImageUploadHandler(getKey) {
+  return async (request, response) => {
   const { contentType, size } = request.body;
   const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -77,25 +91,57 @@ app.post("/api/uploads/logo", authenticate, async (request, response) => {
     return response.status(503).json({ error: "As credenciais do Cloudflare R2 não estão configuradas." });
   }
 
-  const extension = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[contentType];
-  const key = `restaurants/${request.user.id}/logo-${crypto.randomUUID()}.${extension}`;
+    const extension = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[contentType];
+    const key = getKey(request.user.id, extension);
+
+    try {
+      const uploadUrl = await getSignedUrl(
+        r2,
+        new PutObjectCommand({
+          Bucket: r2Bucket,
+          Key: key,
+          ContentType: contentType,
+          ContentLength: size,
+        }),
+        { expiresIn: 300 },
+      );
+
+      return response.json({ key, uploadUrl });
+    } catch (error) {
+      console.error("Could not create R2 upload URL", error);
+      return response.status(500).json({ error: "Não foi possível preparar o upload da imagem." });
+    }
+  };
+}
+
+app.post(
+  "/api/uploads/logo",
+  authenticate,
+  createImageUploadHandler((userId, extension) =>
+    `restaurants/${userId}/logo-${crypto.randomUUID()}.${extension}`),
+);
+
+app.post(
+  "/api/uploads/product",
+  authenticate,
+  createImageUploadHandler((userId, extension) =>
+    `restaurants/${userId}/products/product-${crypto.randomUUID()}.${extension}`),
+);
+
+app.delete("/api/uploads", authenticate, async (request, response) => {
+  const key = typeof request.query.key === "string" ? request.query.key : "";
+  const userPrefix = `restaurants/${request.user.id}/`;
+
+  if (!key.startsWith(userPrefix) || key.includes("..")) {
+    return response.status(400).json({ error: "Arquivo inválido." });
+  }
 
   try {
-    const uploadUrl = await getSignedUrl(
-      r2,
-      new PutObjectCommand({
-        Bucket: r2Bucket,
-        Key: key,
-        ContentType: contentType,
-        ContentLength: size,
-      }),
-      { expiresIn: 300 },
-    );
-
-    return response.json({ key, uploadUrl });
+    await r2.send(new DeleteObjectCommand({ Bucket: r2Bucket, Key: key }));
+    return response.status(204).end();
   } catch (error) {
-    console.error("Could not create R2 upload URL", error);
-    return response.status(500).json({ error: "Não foi possível preparar o upload da logo." });
+    console.error("Could not delete R2 object", error);
+    return response.status(500).json({ error: "Não foi possível remover a imagem." });
   }
 });
 
@@ -117,6 +163,13 @@ app.get("/api/media", async (request, response) => {
     console.error("Could not read R2 object", error);
     return response.status(404).send("Media not found");
   }
+});
+
+app.use("/api", (error, _request, response, next) => {
+  if (response.headersSent) return next(error);
+
+  console.error("Unhandled API error", error);
+  return response.status(500).json({ error: "Ocorreu um erro interno na API." });
 });
 
 if (isDevelopment) {
