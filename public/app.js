@@ -114,20 +114,14 @@ async function uploadImage(file, endpoint) {
   const uploadResponse = await fetch(endpoint, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": file.type,
       Authorization: `Bearer ${sessionData.session.access_token}`,
+      "X-File-Size": String(file.size),
     },
-    body: JSON.stringify({ contentType: file.type, size: file.size }),
+    body: file,
   });
   const upload = await readApiResponse(uploadResponse);
   if (!uploadResponse.ok) throw new Error(upload.error);
-
-  const r2Response = await fetch(upload.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-  if (!r2Response.ok) throw new Error("O upload da imagem para o R2 falhou.");
 
   return upload.key;
 }

@@ -76,37 +76,34 @@ async function authenticate(request, response, next) {
 
 function createImageUploadHandler(getKey) {
   return async (request, response) => {
-  const { contentType, size } = request.body;
-  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const contentType = request.get("content-type")?.split(";")[0];
+    const size = request.body?.length || 0;
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-  if (!allowedTypes.has(contentType)) {
-    return response.status(400).json({ error: "Use uma imagem JPG, PNG ou WebP." });
-  }
+    if (!allowedTypes.has(contentType)) {
+      return response.status(400).json({ error: "Use uma imagem JPG, PNG ou WebP." });
+    }
 
-  if (!Number.isInteger(size) || size <= 0 || size > 5 * 1024 * 1024) {
-    return response.status(400).json({ error: "A logo deve ter no máximo 5 MB." });
-  }
+    if (!Number.isInteger(size) || size <= 0 || size > 5 * 1024 * 1024) {
+      return response.status(400).json({ error: "A imagem deve ter no máximo 5 MB." });
+    }
 
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
-    return response.status(503).json({ error: "As credenciais do Cloudflare R2 não estão configuradas." });
-  }
+    if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
+      return response.status(503).json({ error: "As credenciais do Cloudflare R2 não estão configuradas." });
+    }
 
     const extension = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[contentType];
     const key = getKey(request.user.id, extension);
 
     try {
-      const uploadUrl = await getSignedUrl(
-        r2,
-        new PutObjectCommand({
-          Bucket: r2Bucket,
-          Key: key,
-          ContentType: contentType,
-          ContentLength: size,
-        }),
-        { expiresIn: 300 },
-      );
-
-      return response.json({ key, uploadUrl });
+      await r2.send(new PutObjectCommand({
+        Bucket: r2Bucket,
+        Key: key,
+        Body: request.body,
+        ContentType: contentType,
+        ContentLength: size,
+      }));
+      return response.json({ key });
     } catch (error) {
       console.error("Could not create R2 upload URL", error);
       return response.status(500).json({ error: "Não foi possível preparar o upload da imagem." });
@@ -114,9 +111,15 @@ function createImageUploadHandler(getKey) {
   };
 }
 
+const parseImage = express.raw({
+  type: ["image/jpeg", "image/png", "image/webp"],
+  limit: "5mb",
+});
+
 app.post(
   "/api/uploads/logo",
   authenticate,
+  parseImage,
   createImageUploadHandler((userId, extension) =>
     `restaurants/${userId}/logo-${crypto.randomUUID()}.${extension}`),
 );
@@ -124,6 +127,7 @@ app.post(
 app.post(
   "/api/uploads/product",
   authenticate,
+  parseImage,
   createImageUploadHandler((userId, extension) =>
     `restaurants/${userId}/products/product-${crypto.randomUUID()}.${extension}`),
 );
