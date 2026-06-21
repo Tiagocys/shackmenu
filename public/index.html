@@ -417,6 +417,33 @@
         <img src="/assets/icons/whatsapp.png" alt="" />
         <span>WhatsApp</span>
       </a>
+      <button id="public-cart-button" class="public-cart-button hidden" type="button">
+        <span>Conferir pedido</span>
+        <strong id="public-cart-count">0 itens</strong>
+      </button>
+      <div id="public-cart-overlay" class="public-cart-overlay hidden" role="presentation">
+        <aside class="public-cart" role="dialog" aria-modal="true" aria-labelledby="public-cart-title">
+          <header class="public-cart-header">
+            <div>
+              <span class="eyebrow">Seu pedido</span>
+              <h2 id="public-cart-title">Vamos conferir?</h2>
+            </div>
+            <button id="public-cart-close" class="public-cart-close" type="button" aria-label="Fechar pedido">×</button>
+          </header>
+          <div id="public-cart-items" class="public-cart-items"></div>
+          <p id="public-cart-empty" class="public-cart-empty">Seu pedido ainda está vazio.</p>
+          <div id="public-cart-summary" class="public-cart-summary hidden">
+            <label for="public-order-notes">Alguma observação?</label>
+            <textarea id="public-order-notes" maxlength="500" rows="3" placeholder="Ex: sem cebola, ponto da carne..." ></textarea>
+            <div class="public-cart-total"><span>Subtotal</span><strong id="public-cart-total"></strong></div>
+            <button id="public-cart-send" class="public-cart-send" type="button">
+              <img src="/assets/icons/whatsapp.png" alt="" />
+              Enviar pedido pelo WhatsApp
+            </button>
+            <small>Você poderá combinar entrega e pagamento diretamente com o restaurante.</small>
+          </div>
+        </aside>
+      </div>
       <footer class="public-menu-footer">Feito com <strong>Shack Menu</strong></footer>
     </section>
   </main>

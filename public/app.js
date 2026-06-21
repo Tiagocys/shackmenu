@@ -69,6 +69,16 @@ const publicMenuContent = document.querySelector("#public-menu-content");
 const publicWhatsapp = document.querySelector("#public-whatsapp");
 const publicInstagram = document.querySelector("#public-instagram");
 const publicInstagramLabel = document.querySelector("#public-instagram-label");
+const publicCartButton = document.querySelector("#public-cart-button");
+const publicCartCount = document.querySelector("#public-cart-count");
+const publicCartOverlay = document.querySelector("#public-cart-overlay");
+const publicCartClose = document.querySelector("#public-cart-close");
+const publicCartItems = document.querySelector("#public-cart-items");
+const publicCartEmpty = document.querySelector("#public-cart-empty");
+const publicCartSummary = document.querySelector("#public-cart-summary");
+const publicCartTotal = document.querySelector("#public-cart-total");
+const publicOrderNotes = document.querySelector("#public-order-notes");
+const publicCartSend = document.querySelector("#public-cart-send");
 const settingsBack = document.querySelector("#settings-back");
 const settingsForm = document.querySelector("#settings-form");
 const settingsRestaurantName = document.querySelector("#settings-restaurant-name");
@@ -132,6 +142,8 @@ let upgradeReturnView = "items";
 let adminReturnView = "items";
 let adminAccess = false;
 let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
+let activePublicMenu = null;
+let publicCart = [];
 
 function showView(name) {
   Object.entries(views).forEach(([viewName, element]) => {
@@ -685,6 +697,129 @@ function renderSharePanel() {
   openPublicMenu.href = url;
 }
 
+function getPublicCartStorageKey() {
+  return activePublicMenu ? `shackmenu:cart:${activePublicMenu.restaurant.id}` : null;
+}
+
+function getPublicMenuProducts() {
+  return activePublicMenu?.categories.flatMap((category) => category.products) || [];
+}
+
+function savePublicCart() {
+  const key = getPublicCartStorageKey();
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(publicCart));
+  } catch (error) {
+    console.error("Could not save cart", error);
+  }
+}
+
+function loadPublicCart() {
+  const key = getPublicCartStorageKey();
+  const availableIds = new Set(getPublicMenuProducts().map((product) => product.id));
+  publicCart = [];
+  if (!key) return;
+
+  try {
+    const storedCart = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!Array.isArray(storedCart)) return;
+    publicCart = storedCart
+      .filter((item) => availableIds.has(item.productId) && Number.isInteger(item.quantity))
+      .map((item) => ({ productId: item.productId, quantity: Math.min(99, Math.max(1, item.quantity)) }));
+  } catch (error) {
+    console.error("Could not load cart", error);
+  }
+}
+
+function getPublicCartDetails() {
+  const productsById = new Map(getPublicMenuProducts().map((product) => [product.id, product]));
+  return publicCart.flatMap((item) => {
+    const product = productsById.get(item.productId);
+    return product ? [{ ...item, product, subtotal: product.price_cents * item.quantity }] : [];
+  });
+}
+
+function updatePublicCartItem(productId, change) {
+  const item = publicCart.find((cartItem) => cartItem.productId === productId);
+  if (!item && change > 0) publicCart.push({ productId, quantity: 1 });
+  if (item) item.quantity = Math.min(99, item.quantity + change);
+  publicCart = publicCart.filter((cartItem) => cartItem.quantity > 0);
+  savePublicCart();
+  renderPublicCart();
+}
+
+function openPublicCart() {
+  publicCartOverlay.classList.remove("hidden");
+  document.body.classList.add("cart-open");
+  publicCartClose.focus();
+}
+
+function closePublicCart() {
+  publicCartOverlay.classList.add("hidden");
+  document.body.classList.remove("cart-open");
+  publicCartButton.focus();
+}
+
+function renderPublicCart() {
+  const details = getPublicCartDetails();
+  const itemCount = details.reduce((total, item) => total + item.quantity, 0);
+  const subtotal = details.reduce((total, item) => total + item.subtotal, 0);
+  publicCartCount.textContent = `${itemCount} ${itemCount === 1 ? "item" : "itens"}`;
+  publicCartItems.replaceChildren();
+  publicCartEmpty.classList.toggle("hidden", details.length > 0);
+  publicCartSummary.classList.toggle("hidden", details.length === 0);
+  publicCartTotal.textContent = formatPrice(subtotal);
+
+  details.forEach(({ product, quantity, subtotal: itemSubtotal }) => {
+    const item = document.createElement("article");
+    item.className = "public-cart-item";
+    const copy = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = product.name;
+    const price = document.createElement("small");
+    price.textContent = formatPrice(itemSubtotal);
+    copy.append(name, price);
+
+    const quantityControl = document.createElement("div");
+    quantityControl.className = "public-cart-quantity";
+    const decrease = document.createElement("button");
+    decrease.type = "button";
+    decrease.textContent = "−";
+    decrease.setAttribute("aria-label", `Remover uma unidade de ${product.name}`);
+    decrease.addEventListener("click", () => updatePublicCartItem(product.id, -1));
+    const value = document.createElement("span");
+    value.textContent = quantity;
+    const increase = document.createElement("button");
+    increase.type = "button";
+    increase.textContent = "+";
+    increase.setAttribute("aria-label", `Adicionar uma unidade de ${product.name}`);
+    increase.addEventListener("click", () => updatePublicCartItem(product.id, 1));
+    quantityControl.append(decrease, value, increase);
+    item.append(copy, quantityControl);
+    publicCartItems.append(item);
+  });
+}
+
+function sendPublicCartToWhatsapp() {
+  if (!activePublicMenu?.restaurant.whatsapp_number) return;
+  const details = getPublicCartDetails();
+  if (!details.length) return;
+
+  const subtotal = details.reduce((total, item) => total + item.subtotal, 0);
+  const lines = [
+    `Olá! Gostaria de fazer um pedido no ${activePublicMenu.restaurant.name}:`,
+    "",
+    ...details.map(({ product, quantity, subtotal: itemSubtotal }) => `• ${quantity}x ${product.name} — ${formatPrice(itemSubtotal)}`),
+    "",
+    `Subtotal: ${formatPrice(subtotal)}`,
+  ];
+  const notes = publicOrderNotes.value.trim();
+  if (notes) lines.push("", `Observações: ${notes}`);
+  lines.push("", "Podemos combinar a entrega e o pagamento?");
+  window.open(`https://wa.me/${activePublicMenu.restaurant.whatsapp_number}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
+}
+
 function createPublicProductCard(product) {
   const card = document.createElement("article");
   card.className = "public-product-card";
@@ -714,11 +849,26 @@ function createPublicProductCard(product) {
     body.append(description);
   }
 
+  if (activePublicMenu?.restaurant.whatsapp_number) {
+    const addButton = document.createElement("button");
+    addButton.className = "public-product-add";
+    addButton.type = "button";
+    addButton.textContent = "Adicionar ao pedido";
+    addButton.addEventListener("click", () => {
+      updatePublicCartItem(product.id, 1);
+      addButton.textContent = "Adicionado ✓";
+      window.setTimeout(() => { addButton.textContent = "Adicionar ao pedido"; }, 1200);
+    });
+    body.append(addButton);
+  }
+
   card.append(body);
   return card;
 }
 
 function renderPublicMenu(menu) {
+  activePublicMenu = menu;
+  loadPublicCart();
   const visibleCategories = menu.categories.filter((category) => category.products.length > 0);
   siteHeader.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
   const backgroundColor = menu.restaurant.background_color || "#f4f1e9";
@@ -732,6 +882,7 @@ function renderPublicMenu(menu) {
   publicRestaurantLogo.classList.add("hidden");
   publicWhatsapp.classList.add("hidden");
   publicInstagram.classList.add("hidden");
+  publicCartButton.classList.toggle("hidden", !menu.restaurant.whatsapp_number);
 
   if (menu.restaurant.logo_key) {
     publicRestaurantLogo.src = `/api/media?key=${encodeURIComponent(menu.restaurant.logo_key)}`;
@@ -775,6 +926,8 @@ function renderPublicMenu(menu) {
     empty.textContent = "Este cardápio ainda não possui produtos disponíveis.";
     publicMenuContent.append(empty);
   }
+
+  renderPublicCart();
 }
 
 async function loadPublicMenu({ slug, domain }) {
@@ -1119,6 +1272,16 @@ themeColorText.addEventListener("input", () => {
 
 settingsRestaurantName.addEventListener("input", updateThemePreview);
 settingsMenuTagline.addEventListener("input", updateThemePreview);
+
+publicCartButton.addEventListener("click", openPublicCart);
+publicCartClose.addEventListener("click", closePublicCart);
+publicCartOverlay.addEventListener("click", (event) => {
+  if (event.target === publicCartOverlay) closePublicCart();
+});
+publicCartSend.addEventListener("click", sendPublicCartToWhatsapp);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !publicCartOverlay.classList.contains("hidden")) closePublicCart();
+});
 
 settingsLogoInput.addEventListener("change", async () => {
   const file = settingsLogoInput.files[0];
