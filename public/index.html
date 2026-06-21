@@ -16,8 +16,14 @@
       <span class="brand-mark">S</span>
       <span>Shack Menu</span>
     </a>
-    <button id="sign-out" class="button button-ghost hidden" type="button">Sair</button>
+    <div class="header-actions">
+      <button id="admin-menu" class="button button-ghost hidden" type="button">Administrar</button>
+      <button id="upgrade-menu" class="button button-upgrade hidden" type="button">Upgrade</button>
+      <button id="customize-menu" class="button button-ghost hidden" type="button">Personalizar</button>
+      <button id="sign-out" class="button button-ghost hidden" type="button">Sair</button>
+    </div>
   </header>
+  <div id="billing-notice" class="billing-notice hidden" role="status"></div>
 
   <main>
     <section id="loading-view" class="centered-view" aria-live="polite">
@@ -150,6 +156,10 @@
         </div>
 
         <form id="product-form" class="product-form">
+          <div id="product-quota-warning" class="quota-warning hidden">
+            <div><strong>Limite do plano atingido</strong><p>O plano gratuito permite até 10 produtos.</p></div>
+            <button id="quota-upgrade" class="button button-upgrade" type="button">Conhecer o Pro</button>
+          </div>
           <div class="product-fields-row">
             <div class="field-group field-grow">
               <label for="product-name">Nome do produto</label>
@@ -217,18 +227,205 @@
       </div>
     </section>
 
+    <section id="settings-view" class="settings-view hidden">
+      <div class="settings-shell">
+        <div class="settings-heading">
+          <div>
+            <span class="eyebrow">Personalização</span>
+            <h1>A aparência da sua loja.</h1>
+            <p>Atualize a identidade do cardápio e seus canais de contato.</p>
+          </div>
+          <button id="settings-back" class="button button-ghost" type="button">← Voltar</button>
+        </div>
+
+        <div class="settings-grid">
+          <form id="settings-form" class="settings-form">
+            <div class="field-group">
+              <label for="settings-restaurant-name">Nome do restaurante</label>
+              <input id="settings-restaurant-name" name="restaurantName" type="text" minlength="2" maxlength="80" required />
+              <small class="field-hint">Alterar o nome não muda o endereço já publicado do cardápio.</small>
+            </div>
+
+            <div class="field-group">
+              <label for="settings-menu-tagline">Frase de apresentação</label>
+              <input id="settings-menu-tagline" name="menuTagline" type="text" minlength="1" maxlength="120" required placeholder="Escolha seus favoritos." />
+              <small class="field-hint">Esta frase aparece logo abaixo do nome do restaurante.</small>
+            </div>
+
+            <div class="field-group">
+              <label for="theme-color">Cor de fundo</label>
+              <div class="color-field">
+                <input id="theme-color" name="backgroundColor" type="color" value="#f4f1e9" />
+                <input id="theme-color-text" type="text" value="#f4f1e9" maxlength="7" aria-label="Cor hexadecimal" />
+              </div>
+            </div>
+
+            <div class="field-group">
+              <label>Logo do restaurante</label>
+              <label class="logo-upload" for="settings-logo">
+                <input id="settings-logo" type="file" accept="image/png,image/jpeg,image/webp" />
+                <span id="settings-logo-preview" class="logo-preview"><strong>+</strong></span>
+                <span class="upload-copy"><strong id="settings-logo-title">Alterar logo</strong><small id="settings-logo-hint">JPG, PNG ou WebP, até 10 MB</small></span>
+              </label>
+            </div>
+
+            <div class="field-group">
+              <label for="whatsapp-number">WhatsApp <span class="optional">opcional</span></label>
+              <input id="whatsapp-number" name="whatsapp" type="tel" inputmode="tel" placeholder="Ex: (11) 99999-9999" />
+              <small class="field-hint">Números brasileiros recebem automaticamente o código +55.</small>
+            </div>
+
+            <div class="field-group">
+              <label for="instagram-username">Instagram <span class="optional">opcional</span></label>
+              <input id="instagram-username" name="instagram" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="@meurestaurante" />
+              <small class="field-hint">Você pode informar somente o @usuário ou colar a URL do perfil.</small>
+            </div>
+
+            <div id="custom-domain-group" class="field-group hidden">
+              <label for="custom-domain">Domínio próprio <span class="plan-badge">Pro</span></label>
+              <input id="custom-domain" name="customDomain" type="text" inputmode="url" autocapitalize="none" autocomplete="url" spellcheck="false" placeholder="meurestaurante.com.br" />
+              <small class="field-hint">Informe somente o domínio principal, sem <strong>menu.</strong> e sem <strong>https://</strong>.</small>
+              <ol class="domain-tutorial">
+                <li>Informe seu domínio e salve a personalização.</li>
+                <li>O Shack Menu criará automaticamente o endereço <strong>menu.seudominio.com</strong>.</li>
+                <li>No painel onde seu domínio é gerenciado, abra a área de DNS e crie o registro CNAME exibido abaixo.</li>
+                <li>Mantenha o registro enquanto usar o domínio. A ativação e o certificado SSL serão acompanhados automaticamente.</li>
+              </ol>
+              <div id="custom-domain-status" class="domain-status hidden" role="status">
+                <strong id="custom-domain-status-title"></strong>
+                <p id="custom-domain-status-copy"></p>
+                <a id="custom-domain-link" class="hidden" href="#" target="_blank" rel="noopener"></a>
+                <div id="custom-domain-cname" class="dns-instructions">
+                  <p><strong>1.</strong> Acesse o painel onde você comprou ou gerencia seu domínio e abra a área <strong>DNS</strong>.</p>
+                  <p><strong>2.</strong> Escolha adicionar um novo registro e preencha:</p>
+                  <dl class="dns-record-fields">
+                    <div><dt>Tipo</dt><dd>CNAME</dd></div>
+                    <div><dt>Nome / Host</dt><dd id="custom-domain-cname-name">menu</dd></div>
+                    <div><dt>Destino / Valor</dt><dd id="custom-domain-cname-target"></dd></div>
+                  </dl>
+                  <button id="copy-domain-target" class="button button-ghost" type="button">Copiar destino</button>
+                  <p><strong>3.</strong> Se existir a opção de proxy, selecione <strong>DNS only</strong>. Salve o registro e volte a esta página para acompanhar a ativação.</p>
+                  <small>Não altere os nameservers e não remova outros registros do domínio.</small>
+                </div>
+              </div>
+            </div>
+
+            <p id="settings-error" class="form-error hidden" role="alert"></p>
+            <p id="settings-success" class="form-success hidden" role="status">Personalização salva.</p>
+            <button id="settings-submit" class="button button-primary" type="submit">Salvar personalização</button>
+          </form>
+
+          <div class="theme-preview-wrap">
+            <span>Prévia</span>
+            <div id="theme-preview" class="theme-preview">
+              <div class="theme-preview-hero">
+                <span id="theme-preview-logo" class="theme-preview-logo">S</span>
+                <strong id="theme-preview-name">Seu restaurante</strong>
+                <small id="theme-preview-tagline">Escolha seus favoritos.</small>
+              </div>
+              <div class="theme-preview-product"><span></span><div><strong>Produto em destaque</strong><small>Descrição do produto</small></div></div>
+              <div class="theme-preview-product"><span></span><div><strong>Outro produto</strong><small>Descrição do produto</small></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="upgrade-view" class="upgrade-view hidden">
+      <div class="upgrade-shell">
+        <div class="upgrade-heading">
+          <button id="upgrade-back" class="button button-ghost" type="button">← Voltar</button>
+          <span class="eyebrow">Planos Shack Menu</span>
+          <h1>Comece grátis. Cresça com o Pro.</h1>
+          <p>Escolha o plano adequado ao tamanho do seu cardápio.</p>
+        </div>
+
+        <p id="upgrade-message" class="form-success hidden" role="status"></p>
+        <p id="upgrade-error" class="form-error hidden" role="alert"></p>
+
+        <div class="pricing-grid">
+          <article class="pricing-card">
+            <span class="pricing-label">Gratuito</span>
+            <h2>R$ 0</h2>
+            <p>Para começar seu cardápio digital.</p>
+            <ul class="pricing-features">
+              <li>1 restaurante por conta</li>
+              <li>Até 10 produtos</li>
+              <li>Categorias ilimitadas</li>
+              <li>Cor, logo e visual personalizáveis</li>
+              <li>Botão de WhatsApp</li>
+              <li>Link público do Shack Menu</li>
+              <li>Hospedagem de imagens otimizada</li>
+            </ul>
+            <button class="button button-plan-current" type="button" disabled>Plano atual</button>
+          </article>
+
+          <article class="pricing-card pricing-card-pro">
+            <span class="pricing-badge">Recomendado</span>
+            <span class="pricing-label">Pro</span>
+            <h2>R$ 49,90 <small>/ mês</small></h2>
+            <p>Mais capacidade e ferramentas de venda.</p>
+            <ul class="pricing-features">
+              <li>Tudo do plano gratuito</li>
+              <li>Até 200 produtos</li>
+              <li>Sem a marca “Feito com Shack Menu”</li>
+              <li>Domínio próprio com SSL</li>
+              <li>Pedidos pelo cardápio <small>em breve</small></li>
+              <li>Cupons e produtos em destaque <small>em breve</small></li>
+              <li>QR Code e importação por planilha <small>em breve</small></li>
+            </ul>
+            <button id="pro-plan-action" class="button button-primary" type="button">Assinar o Pro</button>
+            <small class="pricing-note">Cobrança mensal segura pela Stripe. Cancele quando quiser.</small>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="admin-view" class="admin-view hidden">
+      <div class="admin-shell">
+        <div class="admin-heading">
+          <div>
+            <span class="eyebrow">Administração</span>
+            <h1>Assinaturas e reembolsos.</h1>
+            <p>O reembolso devolve integralmente a última fatura paga e cancela a assinatura imediatamente.</p>
+          </div>
+          <div class="admin-heading-actions">
+            <button id="admin-refresh" class="button button-ghost" type="button">Atualizar</button>
+            <button id="admin-back" class="button button-ghost" type="button">← Voltar</button>
+          </div>
+        </div>
+        <p id="admin-error" class="form-error hidden" role="alert"></p>
+        <p id="admin-success" class="form-success hidden" role="status"></p>
+        <div id="admin-customers" class="admin-customers"></div>
+      </div>
+    </section>
+
     <section id="public-menu-view" class="public-menu-view hidden">
       <header class="menu-hero">
         <img id="public-restaurant-logo" class="public-restaurant-logo hidden" alt="" />
         <span class="eyebrow">Cardápio digital</span>
         <h1 id="public-restaurant-name"></h1>
-        <p>Escolha seus favoritos.</p>
+        <p id="public-menu-tagline">Escolha seus favoritos.</p>
+        <a id="public-instagram" class="public-instagram hidden" href="#" target="_blank" rel="noopener">
+          <img src="/assets/icons/instagram.svg" alt="" />
+          <span id="public-instagram-label">Instagram</span>
+        </a>
       </header>
       <nav id="public-category-nav" class="public-category-nav" aria-label="Categorias"></nav>
       <div id="public-menu-content" class="public-menu-content"></div>
+      <a id="public-whatsapp" class="public-whatsapp hidden" href="#" target="_blank" rel="noopener" aria-label="Falar com o restaurante pelo WhatsApp">
+        <img src="/assets/icons/whatsapp.png" alt="" />
+        <span>WhatsApp</span>
+      </a>
       <footer class="public-menu-footer">Feito com <strong>Shack Menu</strong></footer>
     </section>
   </main>
+
+  <footer id="platform-support-footer" class="platform-support-footer hidden">
+    <span>Precisa de ajuda?</span>
+    <strong id="support-email">support@shackmenu.com</strong>
+    <button id="copy-support-email" type="button">Copiar e-mail</button>
+  </footer>
 
   <script type="module" src="/app.js"></script>
 </body>

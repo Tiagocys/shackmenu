@@ -7,7 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "NODE_ENV=development node server/index.js",
+    "dev": "NODE_ENV=development nodemon --watch server --watch functions --ext js,json --exec node server/index.js",
     "pages:dev": "npm run build && wrangler pages dev --env-file .env",
     "build": "vite build",
     "start": "node server/index.js"
@@ -20,6 +20,7 @@
     "express": "^5.1.0"
   },
   "devDependencies": {
+    "nodemon": "^3.1.10",
     "vite": "^6.1.0",
     "wrangler": "^4.103.0"
   }

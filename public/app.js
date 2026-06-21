@@ -7,10 +7,20 @@ const views = {
   categories: document.querySelector("#categories-view"),
   items: document.querySelector("#items-view"),
   complete: document.querySelector("#complete-view"),
+  settings: document.querySelector("#settings-view"),
+  upgrade: document.querySelector("#upgrade-view"),
+  admin: document.querySelector("#admin-view"),
   publicMenu: document.querySelector("#public-menu-view"),
 };
 
 const loginButton = document.querySelector("#google-login");
+const siteHeader = document.querySelector(".site-header");
+const supportFooter = document.querySelector("#platform-support-footer");
+const supportEmail = document.querySelector("#support-email");
+const copySupportEmail = document.querySelector("#copy-support-email");
+const adminButton = document.querySelector("#admin-menu");
+const upgradeButton = document.querySelector("#upgrade-menu");
+const customizeButton = document.querySelector("#customize-menu");
 const signOutButton = document.querySelector("#sign-out");
 const form = document.querySelector("#restaurant-form");
 const formError = document.querySelector("#form-error");
@@ -42,6 +52,8 @@ const productSubmit = document.querySelector("#product-submit");
 const productList = document.querySelector("#product-list");
 const productEmpty = document.querySelector("#product-empty");
 const productCount = document.querySelector("#product-count");
+const productQuotaWarning = document.querySelector("#product-quota-warning");
+const quotaUpgrade = document.querySelector("#quota-upgrade");
 const finishMenu = document.querySelector("#finish-menu");
 const publishMenu = document.querySelector("#publish-menu");
 const publishError = document.querySelector("#publish-error");
@@ -51,10 +63,56 @@ const copyMenuUrl = document.querySelector("#copy-menu-url");
 const openPublicMenu = document.querySelector("#open-public-menu");
 const publicRestaurantLogo = document.querySelector("#public-restaurant-logo");
 const publicRestaurantName = document.querySelector("#public-restaurant-name");
+const publicMenuTagline = document.querySelector("#public-menu-tagline");
 const publicCategoryNav = document.querySelector("#public-category-nav");
 const publicMenuContent = document.querySelector("#public-menu-content");
+const publicWhatsapp = document.querySelector("#public-whatsapp");
+const publicInstagram = document.querySelector("#public-instagram");
+const publicInstagramLabel = document.querySelector("#public-instagram-label");
+const settingsBack = document.querySelector("#settings-back");
+const settingsForm = document.querySelector("#settings-form");
+const settingsRestaurantName = document.querySelector("#settings-restaurant-name");
+const settingsMenuTagline = document.querySelector("#settings-menu-tagline");
+const themeColor = document.querySelector("#theme-color");
+const themeColorText = document.querySelector("#theme-color-text");
+const whatsappNumber = document.querySelector("#whatsapp-number");
+const instagramUsername = document.querySelector("#instagram-username");
+const customDomainGroup = document.querySelector("#custom-domain-group");
+const customDomainInput = document.querySelector("#custom-domain");
+const customDomainStatus = document.querySelector("#custom-domain-status");
+const customDomainStatusTitle = document.querySelector("#custom-domain-status-title");
+const customDomainStatusCopy = document.querySelector("#custom-domain-status-copy");
+const customDomainLink = document.querySelector("#custom-domain-link");
+const customDomainCname = document.querySelector("#custom-domain-cname");
+const customDomainCnameName = document.querySelector("#custom-domain-cname-name");
+const customDomainCnameTarget = document.querySelector("#custom-domain-cname-target");
+const copyDomainTarget = document.querySelector("#copy-domain-target");
+const settingsLogoInput = document.querySelector("#settings-logo");
+const settingsLogoPreview = document.querySelector("#settings-logo-preview");
+const settingsLogoTitle = document.querySelector("#settings-logo-title");
+const settingsLogoHint = document.querySelector("#settings-logo-hint");
+const settingsError = document.querySelector("#settings-error");
+const settingsSuccess = document.querySelector("#settings-success");
+const settingsSubmit = document.querySelector("#settings-submit");
+const themePreview = document.querySelector("#theme-preview");
+const themePreviewLogo = document.querySelector("#theme-preview-logo");
+const themePreviewName = document.querySelector("#theme-preview-name");
+const themePreviewTagline = document.querySelector("#theme-preview-tagline");
+const upgradeBack = document.querySelector("#upgrade-back");
+const upgradeMessage = document.querySelector("#upgrade-message");
+const upgradeError = document.querySelector("#upgrade-error");
+const proPlanAction = document.querySelector("#pro-plan-action");
+const freePlanCurrent = document.querySelector(".button-plan-current");
+const publicMenuFooter = document.querySelector(".public-menu-footer");
+const billingNotice = document.querySelector("#billing-notice");
+const adminBack = document.querySelector("#admin-back");
+const adminRefresh = document.querySelector("#admin-refresh");
+const adminCustomers = document.querySelector("#admin-customers");
+const adminError = document.querySelector("#admin-error");
+const adminSuccess = document.querySelector("#admin-success");
 
 let supabase;
+let applicationUrl = window.location.origin;
 let currentUser;
 let currentRestaurant;
 let categories = [];
@@ -65,12 +123,148 @@ let logoPreviewUrl = null;
 let optimizedProductImage = null;
 let productImageProcessingPromise = Promise.resolve(null);
 let productImagePreviewUrl = null;
+let optimizedSettingsLogo = null;
+let settingsLogoProcessingPromise = Promise.resolve(null);
+let settingsLogoPreviewUrl = null;
+let activeViewName = "loading";
+let settingsReturnView = "items";
+let upgradeReturnView = "items";
+let adminReturnView = "items";
+let adminAccess = false;
+let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 
 function showView(name) {
   Object.entries(views).forEach(([viewName, element]) => {
     element.classList.toggle("hidden", viewName !== name);
   });
-  signOutButton.classList.toggle("hidden", ["loading", "login", "publicMenu"].includes(name));
+  const publicView = ["loading", "login", "publicMenu"].includes(name);
+  signOutButton.classList.toggle("hidden", publicView);
+  supportFooter.classList.toggle("hidden", name === "loading" || name === "publicMenu");
+  adminButton.classList.toggle("hidden", publicView || name === "admin" || !adminAccess);
+  customizeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "settings" || !currentRestaurant);
+  upgradeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "upgrade" || !currentRestaurant);
+  upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
+  activeViewName = name;
+}
+
+async function authenticatedApi(path, options = {}) {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new Error("Sua sessão expirou.");
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${data.session.access_token}`,
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...options.headers,
+    },
+  });
+  const result = await readApiResponse(response);
+  if (!response.ok) throw new Error(result.error || "A API não concluiu a operação.");
+  return result;
+}
+
+async function loadAdminAccess() {
+  try {
+    const result = await authenticatedApi("/api/admin/access");
+    adminAccess = Boolean(result.isAdmin);
+  } catch (error) {
+    console.error(error);
+    adminAccess = false;
+  }
+}
+
+function formatAdminDate(value) {
+  if (!value) return "Não informado";
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function formatAdminAmount(amount, currency = "brl") {
+  if (!Number.isInteger(amount)) return "Sem pagamento";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(amount / 100);
+}
+
+function renderAdminCustomers(customers) {
+  adminCustomers.replaceChildren();
+  if (!customers.length) {
+    const empty = document.createElement("p");
+    empty.className = "category-empty";
+    empty.textContent = "Nenhuma assinatura encontrada.";
+    adminCustomers.append(empty);
+    return;
+  }
+
+  customers.forEach((customer) => {
+    const item = document.createElement("article");
+    item.className = "admin-customer";
+
+    const info = document.createElement("div");
+    info.className = "admin-customer-info";
+    const name = document.createElement("strong");
+    name.textContent = customer.restaurant;
+    const email = document.createElement("small");
+    email.textContent = customer.email;
+    info.append(name, email);
+
+    const subscription = document.createElement("div");
+    subscription.className = "admin-customer-data";
+    const subscriptionLabel = document.createElement("span");
+    subscriptionLabel.textContent = "Assinatura";
+    const subscriptionStatus = document.createElement("strong");
+    subscriptionStatus.textContent = customer.subscriptionStatus;
+    const subscriptionPeriod = document.createElement("span");
+    subscriptionPeriod.textContent = `Até ${formatAdminDate(customer.currentPeriodEnd)}`;
+    subscription.append(subscriptionLabel, subscriptionStatus, subscriptionPeriod);
+
+    const payment = document.createElement("div");
+    payment.className = "admin-customer-data";
+    const paymentLabel = document.createElement("span");
+    paymentLabel.textContent = "Última fatura";
+    const paymentAmount = document.createElement("strong");
+    paymentAmount.textContent = formatAdminAmount(customer.latestInvoice?.amountPaid, customer.latestInvoice?.currency);
+    const paymentStatus = document.createElement("span");
+    paymentStatus.textContent = customer.latestInvoice?.status || "Não encontrada";
+    payment.append(paymentLabel, paymentAmount, paymentStatus);
+
+    const refund = document.createElement("button");
+    refund.className = "button button-danger";
+    refund.type = "button";
+    refund.dataset.refundOwner = customer.ownerId;
+    refund.dataset.refundLabel = `${customer.restaurant} (${customer.email})`;
+    refund.disabled = !["active", "trialing"].includes(customer.subscriptionStatus)
+      || customer.latestInvoice?.status !== "paid";
+    refund.textContent = customer.subscriptionStatus === "canceled" ? "Cancelada" : "Reembolsar";
+
+    item.append(info, subscription, payment, refund);
+    adminCustomers.append(item);
+  });
+}
+
+async function loadAdminCustomers() {
+  adminError.classList.add("hidden");
+  adminRefresh.disabled = true;
+  adminRefresh.textContent = "Atualizando...";
+  try {
+    const result = await authenticatedApi("/api/admin/customers");
+    renderAdminCustomers(result.customers);
+  } catch (error) {
+    console.error(error);
+    adminError.textContent = error.message;
+    adminError.classList.remove("hidden");
+  } finally {
+    adminRefresh.disabled = false;
+    adminRefresh.textContent = "Atualizar";
+  }
+}
+
+async function openAdmin() {
+  if (!adminAccess) return;
+  adminReturnView = activeViewName === "admin" ? "items" : activeViewName;
+  adminSuccess.classList.add("hidden");
+  showView("admin");
+  await loadAdminCustomers();
 }
 
 function showError(message) {
@@ -196,10 +390,226 @@ function formatFileSize(bytes) {
     : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function normalizeWhatsapp(value) {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return null;
+  const normalized = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  return /^[1-9][0-9]{9,14}$/.test(normalized) ? normalized : undefined;
+}
+
+function normalizeInstagram(value) {
+  let username = value.trim().toLowerCase();
+  if (!username) return null;
+  username = username
+    .replace(/^https?:\/\/(?:www\.)?instagram\.com\//, "")
+    .replace(/^@/, "")
+    .replace(/\/$/, "")
+    .split(/[?#]/)[0];
+  return /^[a-z0-9._]{1,30}$/.test(username) ? username : undefined;
+}
+
+function getContrastColor(hexColor) {
+  const channels = hexColor.slice(1).match(/.{2}/g).map((channel) => Number.parseInt(channel, 16));
+  const luminance = (channels[0] * 299 + channels[1] * 587 + channels[2] * 114) / 1000;
+  return luminance > 145 ? "#1b1a17" : "#ffffff";
+}
+
+function updateThemePreview() {
+  const color = /^#[0-9a-fA-F]{6}$/.test(themeColorText.value)
+    ? themeColorText.value
+    : themeColor.value;
+  themePreview.style.backgroundColor = color;
+  themePreviewName.textContent = settingsRestaurantName.value.trim() || currentRestaurant?.name || "Seu restaurante";
+  themePreviewTagline.textContent = settingsMenuTagline.value.trim() || "Escolha seus favoritos.";
+}
+
+function setSettingsLogoPreview(source) {
+  settingsLogoPreview.replaceChildren();
+  themePreviewLogo.replaceChildren();
+
+  if (!source) {
+    settingsLogoPreview.innerHTML = "<strong>+</strong>";
+    themePreviewLogo.textContent = "S";
+    return;
+  }
+
+  const settingsImage = document.createElement("img");
+  settingsImage.src = source;
+  settingsImage.alt = "Prévia da logo";
+  const previewImage = settingsImage.cloneNode();
+  previewImage.alt = "";
+  settingsLogoPreview.append(settingsImage);
+  themePreviewLogo.append(previewImage);
+}
+
+async function openSettings() {
+  settingsReturnView = activeViewName;
+  settingsError.classList.add("hidden");
+  settingsSuccess.classList.add("hidden");
+  settingsForm.reset();
+  optimizedSettingsLogo = null;
+  settingsLogoProcessingPromise = Promise.resolve(null);
+
+  try {
+    await loadPlanUsage();
+  } catch (error) {
+    console.error(error);
+  }
+
+  const color = currentRestaurant.background_color || "#f4f1e9";
+  settingsRestaurantName.value = currentRestaurant.name;
+  settingsMenuTagline.value = currentRestaurant.menu_tagline || "Escolha seus favoritos.";
+  themeColor.value = color;
+  themeColorText.value = color;
+  whatsappNumber.value = currentRestaurant.whatsapp_number ? `+${currentRestaurant.whatsapp_number}` : "";
+  instagramUsername.value = currentRestaurant.instagram_username ? `@${currentRestaurant.instagram_username}` : "";
+  customDomainGroup.classList.toggle("hidden", planUsage.plan !== "pro");
+  customDomainInput.value = currentRestaurant.custom_domain?.replace(/^menu\./, "") || "";
+  renderCustomDomainStatus({
+    domain: currentRestaurant.custom_domain,
+    status: currentRestaurant.custom_domain_status,
+    cname: currentRestaurant.custom_domain ? {
+      name: currentRestaurant.custom_domain,
+      target: "proxy-fallback.shackmenu.com",
+    } : null,
+  });
+  settingsLogoTitle.textContent = currentRestaurant.logo_key ? "Alterar logo" : "Adicionar logo";
+  settingsLogoHint.textContent = "JPG, PNG ou WebP, até 10 MB";
+  const currentLogo = currentRestaurant.logo_key
+    ? `/api/media?key=${encodeURIComponent(currentRestaurant.logo_key)}`
+    : null;
+  setSettingsLogoPreview(currentLogo);
+  updateThemePreview();
+  showView("settings");
+
+  if (planUsage.plan === "pro" && currentRestaurant.custom_domain) {
+    refreshCustomDomain().catch((error) => console.error(error));
+  }
+}
+
+function renderCustomDomainStatus(result) {
+  customDomainStatus.classList.toggle("hidden", !result?.domain);
+  if (!result?.domain) return;
+
+  const active = result.status === "active";
+  customDomainStatus.classList.toggle("domain-status-active", active);
+  customDomainStatus.classList.toggle("domain-status-pending", !active);
+  customDomainStatusTitle.textContent = active ? "Domínio ativo" : "Aguardando configuração do DNS";
+  customDomainStatusCopy.textContent = active
+    ? "Seu cardápio está disponível neste endereço:"
+    : "No provedor do seu domínio, crie o seguinte registro CNAME:";
+  customDomainLink.classList.toggle("hidden", !active);
+  customDomainLink.href = active ? `https://${result.domain}` : "#";
+  customDomainLink.textContent = active ? `https://${result.domain}` : "";
+  customDomainCname.classList.toggle("hidden", active);
+  customDomainCnameName.textContent = "menu";
+  customDomainCnameTarget.textContent = result.cname?.target?.replace(/\.$/, "") || "";
+}
+
+async function requestCustomDomain(domain, method = "POST") {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) throw new Error("Sua sessão expirou.");
+  const response = await fetch("/api/domains", {
+    method,
+    headers: {
+      Authorization: `Bearer ${data.session.access_token}`,
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    },
+    body: method === "POST" ? JSON.stringify({ domain }) : undefined,
+  });
+  const result = await readApiResponse(response);
+  if (!response.ok) throw new Error(result.error);
+  return result;
+}
+
+async function refreshCustomDomain() {
+  const result = await requestCustomDomain(null, "GET");
+  currentRestaurant = {
+    ...currentRestaurant,
+    custom_domain: result.domain,
+    custom_domain_status: result.status,
+  };
+  renderCustomDomainStatus(result);
+  renderSharePanel();
+}
+
+async function openUpgrade() {
+  upgradeReturnView = activeViewName === "upgrade" ? "items" : activeViewName;
+  upgradeError.classList.add("hidden");
+
+  try {
+    await loadPlanUsage();
+  } catch (error) {
+    console.error(error);
+  }
+
+  renderUpgradePlanState();
+  showView("upgrade");
+}
+
+function renderUpgradePlanState() {
+  const isPro = planUsage.plan === "pro";
+  freePlanCurrent.textContent = isPro ? "Plano incluído" : "Plano atual";
+  proPlanAction.textContent = isPro ? "Gerenciar assinatura" : "Assinar o Pro";
+  upgradeButton.textContent = isPro ? "Gerenciar plano" : "Upgrade";
+}
+
+async function waitForProActivation() {
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    await loadPlanUsage();
+    if (planUsage.plan === "pro") {
+      renderUpgradePlanState();
+      upgradeMessage.textContent = "Plano Pro ativado. Seu limite agora é de 200 produtos.";
+      billingNotice.textContent = "Plano Pro ativado. Seu limite agora é de 200 produtos.";
+      billingNotice.classList.remove("hidden");
+      window.setTimeout(() => billingNotice.classList.add("hidden"), 5000);
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 2000));
+  }
+
+  upgradeMessage.textContent = "Pagamento recebido. A confirmação está demorando mais que o esperado; atualize a página em alguns instantes.";
+  billingNotice.textContent = upgradeMessage.textContent;
+}
+
+async function createBillingSession(endpoint) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) throw new Error("Sua sessão expirou.");
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+  });
+  const result = await readApiResponse(response);
+  if (!response.ok) throw new Error(result.error);
+  return result;
+}
+
+async function handlePlanButton() {
+  if (planUsage.plan !== "pro") {
+    await openUpgrade();
+    return;
+  }
+
+  upgradeButton.disabled = true;
+  upgradeButton.textContent = "Abrindo...";
+  try {
+    const session = await createBillingSession("/api/billing/portal");
+    window.location.assign(session.url);
+  } catch (error) {
+    console.error(error);
+    upgradeButton.textContent = "Tente novamente";
+    window.setTimeout(() => {
+      upgradeButton.disabled = false;
+      upgradeButton.textContent = "Gerenciar plano";
+    }, 1800);
+  }
+}
+
 async function loadRestaurant() {
   const { data, error } = await supabase
     .from("restaurants")
-    .select("id, name, logo_key, slug, published_at")
+    .select("id, name, logo_key, slug, published_at, background_color, menu_tagline, whatsapp_number, instagram_username, custom_domain, custom_domain_status")
     .eq("owner_id", currentUser.id)
     .maybeSingle();
 
@@ -238,13 +648,39 @@ function getPublicMenuPath() {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+function getCustomMenuDomain() {
+  const hostname = window.location.hostname.toLowerCase();
+  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
+  const isPagesHost = hostname === "shackmenu-axb.pages.dev" || hostname.endsWith(".pages.dev");
+  const isPlatformHost = [
+    "shackmenu.com",
+    "www.shackmenu.com",
+    "app.shackmenu.com",
+    "customers.shackmenu.com",
+    "proxy-fallback.shackmenu.com",
+  ].includes(hostname);
+  return !isLocal && !isPagesHost && !isPlatformHost && window.location.pathname === "/" ? hostname : null;
+}
+
+function normalizeCustomDomain(value) {
+  const normalized = value.trim().toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "");
+  if (!normalized) return null;
+  if (normalized.includes("/") || normalized.includes(":") || normalized.includes("?") || normalized.includes("#")) return undefined;
+  if (normalized.length > 253 || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(normalized)) return undefined;
+  return normalized;
+}
+
 function renderSharePanel() {
   const isPublished = Boolean(currentRestaurant?.slug && currentRestaurant?.published_at);
   publishMenu.classList.toggle("hidden", isPublished);
   sharePanel.classList.toggle("hidden", !isPublished);
 
   if (!isPublished) return;
-  const url = `${window.location.origin}/m/${currentRestaurant.slug}`;
+  const url = currentRestaurant.custom_domain && currentRestaurant.custom_domain_status === "active"
+    ? `https://${currentRestaurant.custom_domain}`
+    : `${window.location.origin}/m/${currentRestaurant.slug}`;
   publicMenuUrl.value = url;
   openPublicMenu.href = url;
 }
@@ -284,14 +720,35 @@ function createPublicProductCard(product) {
 
 function renderPublicMenu(menu) {
   const visibleCategories = menu.categories.filter((category) => category.products.length > 0);
+  siteHeader.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
+  const backgroundColor = menu.restaurant.background_color || "#f4f1e9";
+  views.publicMenu.style.setProperty("--menu-background", backgroundColor);
+  views.publicMenu.style.setProperty("--menu-foreground", getContrastColor(backgroundColor));
   publicRestaurantName.textContent = menu.restaurant.name;
+  publicMenuTagline.textContent = menu.restaurant.menu_tagline || "Escolha seus favoritos.";
   publicCategoryNav.replaceChildren();
   publicMenuContent.replaceChildren();
+  publicMenuFooter.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
+  publicRestaurantLogo.classList.add("hidden");
+  publicWhatsapp.classList.add("hidden");
+  publicInstagram.classList.add("hidden");
 
   if (menu.restaurant.logo_key) {
     publicRestaurantLogo.src = `/api/media?key=${encodeURIComponent(menu.restaurant.logo_key)}`;
     publicRestaurantLogo.alt = `Logo do ${menu.restaurant.name}`;
     publicRestaurantLogo.classList.remove("hidden");
+  }
+
+  if (menu.restaurant.whatsapp_number) {
+    const message = encodeURIComponent(`Olá! Vim pelo cardápio do ${menu.restaurant.name}.`);
+    publicWhatsapp.href = `https://wa.me/${menu.restaurant.whatsapp_number}?text=${message}`;
+    publicWhatsapp.classList.remove("hidden");
+  }
+
+  if (menu.restaurant.instagram_username) {
+    publicInstagram.href = `https://www.instagram.com/${menu.restaurant.instagram_username}/`;
+    publicInstagramLabel.textContent = `@${menu.restaurant.instagram_username}`;
+    publicInstagram.classList.remove("hidden");
   }
 
   visibleCategories.forEach((category) => {
@@ -320,13 +777,19 @@ function renderPublicMenu(menu) {
   }
 }
 
-async function loadPublicMenu(slug) {
+async function loadPublicMenu({ slug, domain }) {
   showView("loading");
-  const { data, error } = await supabase.rpc("get_public_menu", { menu_slug: slug });
+  const { data, error } = domain
+    ? await supabase.rpc("get_public_menu_by_domain", { menu_domain: domain })
+    : await supabase.rpc("get_public_menu", { menu_slug: slug });
 
   if (error || !data) {
     views.loading.innerHTML = '<div class="setup-error"><strong>Cardápio não encontrado</strong><p>Confira o endereço ou tente novamente mais tarde.</p></div>';
     return;
+  }
+
+  if (slug && data.restaurant.slug && data.restaurant.slug !== slug) {
+    window.history.replaceState({}, "", `/m/${data.restaurant.slug}`);
   }
 
   renderPublicMenu(data);
@@ -409,11 +872,28 @@ function parsePriceToCents(value) {
   return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
 }
 
+function applyProductQuota() {
+  planUsage.product_count = products.length;
+  const atLimit = products.length >= planUsage.product_limit;
+  productQuotaWarning.classList.toggle("hidden", !atLimit);
+  productForm.querySelectorAll("input, select, textarea").forEach((field) => {
+    field.disabled = atLimit;
+  });
+  productSubmit.disabled = atLimit;
+}
+
+async function loadPlanUsage() {
+  const { data, error } = await supabase.rpc("get_plan_usage");
+  if (error) throw error;
+  planUsage = data || { plan: "free", product_count: products.length, product_limit: 10 };
+  upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
+}
+
 function renderProducts() {
   productList.replaceChildren();
   productEmpty.classList.toggle("hidden", products.length > 0);
   finishMenu.disabled = products.length === 0;
-  productCount.textContent = `${products.length} ${products.length === 1 ? "produto" : "produtos"}`;
+  productCount.textContent = `${products.length} de ${planUsage.product_limit} produtos`;
 
   products.forEach((product) => {
     const item = document.createElement("article");
@@ -451,6 +931,7 @@ function renderProducts() {
     item.append(image, details, price, remove);
     productList.append(item);
   });
+  applyProductQuota();
 }
 
 async function loadProducts() {
@@ -471,6 +952,7 @@ async function openItems() {
   productError.classList.add("hidden");
 
   try {
+    await loadPlanUsage();
     await loadProducts();
   } catch (error) {
     console.error(error);
@@ -489,6 +971,7 @@ async function handleSession(session) {
   }
 
   try {
+    await loadAdminAccess();
     await loadRestaurant();
   } catch (error) {
     console.error(error);
@@ -507,17 +990,40 @@ async function init() {
     }
 
     supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
+    applicationUrl = config.appUrl || window.location.origin;
     const publicSlug = getPublicMenuPath();
-    if (publicSlug) {
-      await loadPublicMenu(publicSlug);
+    const customMenuDomain = getCustomMenuDomain();
+    if (publicSlug || customMenuDomain) {
+      await loadPublicMenu({ slug: publicSlug, domain: customMenuDomain });
       return;
     }
 
     const { data } = await supabase.auth.getSession();
     await handleSession(data.session);
 
+    const upgradeStatus = new URLSearchParams(window.location.search).get("upgrade");
+    if (currentRestaurant && upgradeStatus) {
+      if (upgradeStatus === "success") {
+        billingNotice.textContent = planUsage.plan === "pro"
+          ? "Plano Pro ativado. Seu limite agora é de 200 produtos."
+          : "Pagamento recebido. Aguardando confirmação da Stripe...";
+        billingNotice.classList.remove("hidden");
+      } else {
+        await openUpgrade();
+        upgradeMessage.textContent = "Assinatura não concluída. Nenhuma cobrança foi realizada.";
+        upgradeMessage.classList.remove("hidden");
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+      if (upgradeStatus === "success" && planUsage.plan !== "pro") {
+        waitForProActivation().catch((error) => console.error("Could not confirm Pro activation", error));
+      } else if (upgradeStatus === "success") {
+        window.setTimeout(() => billingNotice.classList.add("hidden"), 5000);
+      }
+    }
+
     supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+      const newLogin = event === "SIGNED_IN" && !currentUser;
+      if (newLogin || event === "SIGNED_OUT") {
         window.setTimeout(() => handleSession(session), 0);
       }
     });
@@ -530,7 +1036,7 @@ loginButton.addEventListener("click", async () => {
   loginButton.disabled = true;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo: window.location.origin },
+    options: { redirectTo: `${applicationUrl}/` },
   });
 
   if (error) {
@@ -540,6 +1046,237 @@ loginButton.addEventListener("click", async () => {
 });
 
 signOutButton.addEventListener("click", () => supabase.auth.signOut());
+adminButton.addEventListener("click", openAdmin);
+customizeButton.addEventListener("click", openSettings);
+upgradeButton.addEventListener("click", handlePlanButton);
+quotaUpgrade.addEventListener("click", openUpgrade);
+settingsBack.addEventListener("click", () => showView(settingsReturnView));
+adminBack.addEventListener("click", () => showView(adminReturnView));
+adminRefresh.addEventListener("click", loadAdminCustomers);
+upgradeBack.addEventListener("click", () => showView(upgradeReturnView));
+
+adminCustomers.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-refund-owner]");
+  if (!button) return;
+  const confirmed = window.confirm(
+    `Reembolsar integralmente a última fatura de ${button.dataset.refundLabel} e cancelar a assinatura imediatamente?`,
+  );
+  if (!confirmed) return;
+
+  adminError.classList.add("hidden");
+  adminSuccess.classList.add("hidden");
+  button.disabled = true;
+  button.textContent = "Processando...";
+  try {
+    const result = await authenticatedApi("/api/admin/refund", {
+      method: "POST",
+      body: JSON.stringify({
+        ownerId: button.dataset.refundOwner,
+        confirmation: "REEMBOLSAR",
+      }),
+    });
+    adminSuccess.textContent = `Reembolso ${result.refundStatus} e assinatura ${result.subscriptionStatus}.`;
+    adminSuccess.classList.remove("hidden");
+    await loadAdminCustomers();
+  } catch (error) {
+    console.error(error);
+    adminError.textContent = error.message;
+    adminError.classList.remove("hidden");
+    button.disabled = false;
+    button.textContent = "Reembolsar";
+  }
+});
+
+proPlanAction.addEventListener("click", async () => {
+  upgradeError.classList.add("hidden");
+  proPlanAction.disabled = true;
+  proPlanAction.innerHTML = '<span class="button-spinner"></span> Redirecionando...';
+
+  try {
+    const endpoint = planUsage.plan === "pro" ? "/api/billing/portal" : "/api/billing/checkout";
+    const session = await createBillingSession(endpoint);
+    window.location.assign(session.url);
+  } catch (error) {
+    console.error(error);
+    upgradeError.textContent = error.message || "Não foi possível iniciar a assinatura.";
+    upgradeError.classList.remove("hidden");
+    proPlanAction.disabled = false;
+    proPlanAction.textContent = planUsage.plan === "pro" ? "Gerenciar assinatura" : "Assinar o Pro";
+  }
+});
+
+themeColor.addEventListener("input", () => {
+  themeColorText.value = themeColor.value;
+  updateThemePreview();
+});
+
+themeColorText.addEventListener("input", () => {
+  if (/^#[0-9a-fA-F]{6}$/.test(themeColorText.value)) {
+    themeColor.value = themeColorText.value;
+    updateThemePreview();
+  }
+});
+
+settingsRestaurantName.addEventListener("input", updateThemePreview);
+settingsMenuTagline.addEventListener("input", updateThemePreview);
+
+settingsLogoInput.addEventListener("change", async () => {
+  const file = settingsLogoInput.files[0];
+  optimizedSettingsLogo = null;
+  if (!file) {
+    settingsLogoProcessingPromise = Promise.resolve(null);
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    settingsLogoInput.value = "";
+    settingsLogoProcessingPromise = Promise.resolve(null);
+    settingsError.textContent = "A imagem original deve ter no máximo 10 MB.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  settingsError.classList.add("hidden");
+  settingsSuccess.classList.add("hidden");
+  settingsLogoTitle.textContent = "Otimizando imagem...";
+  settingsLogoHint.textContent = "Redimensionando e convertendo para WebP";
+  settingsSubmit.disabled = true;
+  settingsLogoProcessingPromise = optimizeLogo(file);
+
+  try {
+    const processedFile = await settingsLogoProcessingPromise;
+    if (settingsLogoInput.files[0] !== file) return;
+
+    optimizedSettingsLogo = processedFile;
+    if (settingsLogoPreviewUrl) URL.revokeObjectURL(settingsLogoPreviewUrl);
+    settingsLogoPreviewUrl = URL.createObjectURL(processedFile);
+    setSettingsLogoPreview(settingsLogoPreviewUrl);
+    settingsLogoTitle.textContent = "Imagem pronta";
+    settingsLogoHint.textContent = `${formatFileSize(file.size)} → ${formatFileSize(processedFile.size)} em WebP`;
+  } catch (error) {
+    console.error(error);
+    settingsLogoInput.value = "";
+    settingsLogoProcessingPromise = Promise.resolve(null);
+    settingsError.textContent = "Não foi possível processar essa imagem.";
+    settingsError.classList.remove("hidden");
+  } finally {
+    if (settingsLogoInput.files[0] === file) settingsSubmit.disabled = false;
+  }
+});
+
+settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  settingsError.classList.add("hidden");
+  settingsSuccess.classList.add("hidden");
+
+  const color = themeColorText.value.toLowerCase();
+  const restaurantName = settingsRestaurantName.value.trim();
+  const menuTagline = settingsMenuTagline.value.trim();
+  if (restaurantName.length < 2 || restaurantName.length > 80) {
+    settingsError.textContent = "O nome do restaurante deve ter entre 2 e 80 caracteres.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  if (menuTagline.length < 1 || menuTagline.length > 120) {
+    settingsError.textContent = "A frase de apresentação deve ter entre 1 e 120 caracteres.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  if (!/^#[0-9a-f]{6}$/.test(color)) {
+    settingsError.textContent = "Informe uma cor hexadecimal válida.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  const normalizedWhatsapp = normalizeWhatsapp(whatsappNumber.value);
+  if (normalizedWhatsapp === undefined) {
+    settingsError.textContent = "Informe um WhatsApp válido com DDD.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  const normalizedInstagram = normalizeInstagram(instagramUsername.value);
+  if (normalizedInstagram === undefined) {
+    settingsError.textContent = "Informe um usuário ou URL válida do Instagram.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  const normalizedCustomDomain = planUsage.plan === "pro"
+    ? normalizeCustomDomain(customDomainInput.value)
+    : currentRestaurant.custom_domain;
+  if (normalizedCustomDomain === undefined) {
+    settingsError.textContent = "Informe apenas o domínio, por exemplo: menu.seurestaurante.com.br.";
+    settingsError.classList.remove("hidden");
+    return;
+  }
+
+  settingsSubmit.disabled = true;
+  settingsSubmit.innerHTML = '<span class="button-spinner"></span> Salvando...';
+  const previousName = currentRestaurant.name;
+  const oldLogoKey = currentRestaurant.logo_key;
+  let newLogoKey = oldLogoKey;
+
+  try {
+    const newLogo = settingsLogoInput.files[0]
+      ? optimizedSettingsLogo || await settingsLogoProcessingPromise
+      : null;
+    if (newLogo) newLogoKey = await uploadImage(newLogo, "/api/uploads/logo");
+
+    const { data, error } = await supabase
+      .from("restaurants")
+      .update({
+        name: restaurantName,
+        background_color: color,
+        menu_tagline: menuTagline,
+        whatsapp_number: normalizedWhatsapp,
+        instagram_username: normalizedInstagram,
+        logo_key: newLogoKey,
+      })
+      .eq("id", currentRestaurant.id)
+      .select("name, logo_key, background_color, menu_tagline, whatsapp_number, instagram_username")
+      .single();
+
+    if (error) throw error;
+    currentRestaurant = { ...currentRestaurant, ...data };
+    if (restaurantName !== previousName && currentRestaurant.published_at) {
+      const { data: publishedRestaurant, error: slugError } = await supabase
+        .rpc("publish_restaurant", { requested_slug: slugify(restaurantName) })
+        .single();
+      if (slugError) throw slugError;
+      currentRestaurant = { ...currentRestaurant, ...publishedRestaurant };
+    }
+    updateThemePreview();
+    if (planUsage.plan === "pro" && normalizedCustomDomain !== currentRestaurant.custom_domain) {
+      const domainResult = await requestCustomDomain(normalizedCustomDomain);
+      currentRestaurant = {
+        ...currentRestaurant,
+        custom_domain: domainResult.domain,
+        custom_domain_status: domainResult.status,
+      };
+      customDomainInput.value = domainResult.domain?.replace(/^menu\./, "") || "";
+      renderCustomDomainStatus(domainResult);
+    }
+    if (newLogoKey !== oldLogoKey) await deleteStoredImage(oldLogoKey);
+    settingsLogoInput.value = "";
+    optimizedSettingsLogo = null;
+    settingsLogoProcessingPromise = Promise.resolve(null);
+    settingsLogoTitle.textContent = "Alterar logo";
+    settingsLogoHint.textContent = "JPG, PNG ou WebP, até 10 MB";
+    renderSharePanel();
+    settingsSuccess.classList.remove("hidden");
+  } catch (error) {
+    console.error(error);
+    if (newLogoKey !== oldLogoKey) await deleteStoredImage(newLogoKey);
+    settingsError.textContent = "Não foi possível salvar a personalização.";
+    settingsError.classList.remove("hidden");
+  } finally {
+    settingsSubmit.disabled = false;
+    settingsSubmit.textContent = "Salvar personalização";
+  }
+});
 
 logoInput.addEventListener("change", async () => {
   const file = logoInput.files[0];
@@ -625,7 +1362,7 @@ productImageInput.addEventListener("change", async () => {
     productUploadHint.textContent = "JPG, PNG ou WebP, até 10 MB";
     showProductError("Não foi possível processar essa imagem. Tente outro arquivo.");
   } finally {
-    if (productImageInput.files[0] === file) productSubmit.disabled = false;
+    if (productImageInput.files[0] === file) applyProductQuota();
   }
 });
 
@@ -647,7 +1384,7 @@ form.addEventListener("submit", async (event) => {
     const { data, error } = await supabase
       .from("restaurants")
       .insert({ owner_id: currentUser.id, name, logo_key: logoKey })
-      .select("id, name, logo_key, slug, published_at")
+      .select("id, name, logo_key, slug, published_at, background_color, menu_tagline, whatsapp_number, instagram_username, custom_domain, custom_domain_status")
       .single();
 
     if (error) throw error;
@@ -746,6 +1483,11 @@ productForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   productError.classList.add("hidden");
 
+  if (products.length >= planUsage.product_limit) {
+    applyProductQuota();
+    return;
+  }
+
   const priceCents = parsePriceToCents(productPrice.value);
   if (!priceCents) {
     showProductError("Informe um preço válido, como 29,90.");
@@ -787,10 +1529,12 @@ productForm.addEventListener("submit", async (event) => {
   } catch (error) {
     console.error(error);
     await deleteStoredImage(imageKey);
-    showProductError(error.message || "Não foi possível adicionar o produto.");
+    showProductError(error.message?.includes("PRODUCT_LIMIT_REACHED")
+      ? "Você atingiu o limite de produtos do seu plano."
+      : error.message || "Não foi possível adicionar o produto.");
   } finally {
-    productSubmit.disabled = false;
     productSubmit.textContent = "Adicionar produto";
+    applyProductQuota();
   }
 });
 
@@ -853,6 +1597,29 @@ copyMenuUrl.addEventListener("click", async () => {
   } catch {
     publicMenuUrl.select();
     document.execCommand("copy");
+  }
+});
+
+copyDomainTarget.addEventListener("click", async () => {
+  const target = customDomainCnameTarget.textContent.trim();
+  if (!target) return;
+  try {
+    await navigator.clipboard.writeText(target);
+    copyDomainTarget.textContent = "Destino copiado";
+    window.setTimeout(() => { copyDomainTarget.textContent = "Copiar destino"; }, 1600);
+  } catch {
+    window.prompt("Copie o destino do CNAME:", target);
+  }
+});
+
+copySupportEmail.addEventListener("click", async () => {
+  const email = supportEmail.textContent.trim();
+  try {
+    await navigator.clipboard.writeText(email);
+    copySupportEmail.textContent = "E-mail copiado";
+    window.setTimeout(() => { copySupportEmail.textContent = "Copiar e-mail"; }, 1600);
+  } catch {
+    window.prompt("Copie o e-mail de suporte:", email);
   }
 });
 

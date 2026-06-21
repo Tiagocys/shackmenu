@@ -8,5 +8,9 @@ export function onRequestGet({ env }) {
     return json({ error: "Configure SUPABASE_URL e SUPABASE_ANON_KEY no Pages." }, 503);
   }
 
-  return json({ supabaseUrl, supabaseAnonKey });
+  return json({
+    supabaseUrl,
+    supabaseAnonKey,
+    appUrl: env.PUBLIC_APP_URL || new URL("https://shackmenu.com").origin,
+  });
 }

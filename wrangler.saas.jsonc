@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "shackmenu-saas-proxy",
+  "main": "./workers/saas-proxy.js",
+  "compatibility_date": "2026-06-20",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "*/*",
+      "zone_name": "shackmenu.com"
+    }
+  ]
+}

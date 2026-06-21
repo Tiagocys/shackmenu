@@ -1,8 +1,14 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "shackmenu-axb",
+  "name": "shackmenu",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-06-20",
+  "vars": {
+    "CLOUDFLARE_SAAS_ZONE_ID": "da6ad7573cc4e95deb795b2907dd463d",
+    "CLOUDFLARE_SAAS_CNAME_TARGET": "proxy-fallback.shackmenu.com",
+    "ADMIN_USER_IDS": "a576c808-7da0-4e3f-837c-e87ec3d238a6",
+    "PUBLIC_APP_URL": "https://shackmenu.com"
+  },
   "r2_buckets": [
     {
       "binding": "SHACKMENU_BUCKET",

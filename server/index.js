@@ -6,6 +6,23 @@ import { fileURLToPath } from "node:url";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import express from "express";
+import {
+  adminError,
+  isAdmin,
+  listAdminCustomers,
+  refundAndCancel,
+} from "../functions/_lib/admin.js";
+import {
+  connectCustomDomain,
+  customDomainError,
+  refreshCustomDomain,
+} from "../functions/_lib/domains.js";
+import {
+  getUserSubscription,
+  stripeRequest,
+  syncSubscription,
+  verifyStripeWebhook,
+} from "../functions/_lib/stripe.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,7 +45,12 @@ const r2 = new S3Client({
       : undefined,
 });
 
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({
+  limit: "1mb",
+  verify: (request, _response, buffer) => {
+    if (request.originalUrl === "/api/billing/webhook") request.rawBody = buffer.toString("utf8");
+  },
+}));
 
 app.get("/api/config", (_request, response) => {
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -37,7 +59,11 @@ app.get("/api/config", (_request, response) => {
     });
   }
 
-  return response.json({ supabaseUrl, supabaseAnonKey });
+  return response.json({
+    supabaseUrl,
+    supabaseAnonKey,
+    appUrl: process.env.PUBLIC_APP_URL || `${_request.protocol}://${_request.get("host")}`,
+  });
 });
 
 async function authenticate(request, response, next) {
@@ -146,6 +172,144 @@ app.delete("/api/uploads", authenticate, async (request, response) => {
   } catch (error) {
     console.error("Could not delete R2 object", error);
     return response.status(500).json({ error: "Não foi possível remover a imagem." });
+  }
+});
+
+function toWebRequest(request) {
+  return new Request(`${request.protocol}://${request.get("host")}${request.originalUrl}`, {
+    headers: request.headers,
+  });
+}
+
+app.post("/api/billing/checkout", authenticate, async (request, response) => {
+  try {
+    const webRequest = toWebRequest(request);
+    const existing = await getUserSubscription(webRequest, process.env, request.user.id);
+    if (["active", "trialing"].includes(existing?.status)) {
+      return response.status(409).json({ error: "Sua assinatura Pro já está ativa." });
+    }
+
+    if (!process.env.STRIPE_PRO_PRICE_ID) {
+      return response.status(503).json({ error: "O preço do plano Pro não está configurado." });
+    }
+
+    const origin = process.env.PUBLIC_APP_URL || `${request.protocol}://${request.get("host")}`;
+    const parameters = {
+      mode: "subscription",
+      "line_items[0][price]": process.env.STRIPE_PRO_PRICE_ID,
+      "line_items[0][quantity]": "1",
+      success_url: `${origin}/?upgrade=success`,
+      cancel_url: `${origin}/?upgrade=cancelled`,
+      client_reference_id: request.user.id,
+      "metadata[owner_id]": request.user.id,
+      "subscription_data[metadata][owner_id]": request.user.id,
+      allow_promotion_codes: "true",
+      locale: "pt-BR",
+    };
+    if (existing?.stripe_customer_id) parameters.customer = existing.stripe_customer_id;
+    else parameters.customer_email = request.user.email;
+
+    const session = await stripeRequest(process.env, "/checkout/sessions", parameters);
+    return response.json({ url: session.url });
+  } catch (error) {
+    console.error("Could not create Stripe Checkout", error);
+    return response.status(500).json({ error: "Não foi possível comunicar com a Stripe." });
+  }
+});
+
+app.post("/api/billing/portal", authenticate, async (request, response) => {
+  try {
+    const subscription = await getUserSubscription(toWebRequest(request), process.env, request.user.id);
+    if (!subscription?.stripe_customer_id) {
+      return response.status(404).json({ error: "Assinatura não encontrada." });
+    }
+
+    const parameters = {
+      customer: subscription.stripe_customer_id,
+      return_url: `${process.env.PUBLIC_APP_URL || `${request.protocol}://${request.get("host")}`}/`,
+    };
+    if (process.env.STRIPE_PORTAL_CONFIGURATION_ID) {
+      parameters.configuration = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
+    }
+    const session = await stripeRequest(process.env, "/billing_portal/sessions", parameters);
+    return response.json({ url: session.url });
+  } catch (error) {
+    console.error("Could not create Stripe portal", error);
+    return response.status(500).json({ error: "Não foi possível comunicar com a Stripe." });
+  }
+});
+
+app.post("/api/billing/webhook", async (request, response) => {
+  const payload = request.rawBody || JSON.stringify(request.body);
+  const valid = await verifyStripeWebhook(
+    payload,
+    request.get("stripe-signature"),
+    process.env.STRIPE_WEBHOOK_SECRET,
+  );
+  if (!valid) return response.status(400).json({ error: "Assinatura do webhook inválida." });
+
+  try {
+    const event = JSON.parse(payload);
+    if (event.type === "checkout.session.completed" && event.data.object.subscription) {
+      const subscription = await stripeRequest(process.env, `/subscriptions/${event.data.object.subscription}`);
+      await syncSubscription(subscription, process.env);
+    }
+    if ([
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+    ].includes(event.type)) {
+      await syncSubscription(event.data.object, process.env);
+    }
+    return response.json({ received: true });
+  } catch (error) {
+    console.error("Stripe webhook processing failed", error);
+    return response.status(500).json({ error: "Falha ao processar webhook." });
+  }
+});
+
+app.get("/api/domains", authenticate, async (request, response) => {
+  try {
+    return response.json(await refreshCustomDomain(process.env, request.user.id));
+  } catch (error) {
+    const result = customDomainError(error);
+    return response.status(result.status).json({ error: result.message });
+  }
+});
+
+app.post("/api/domains", authenticate, async (request, response) => {
+  try {
+    return response.json(await connectCustomDomain(process.env, request.user.id, request.body.domain));
+  } catch (error) {
+    const result = customDomainError(error);
+    return response.status(result.status).json({ error: result.message });
+  }
+});
+
+app.get("/api/admin/access", authenticate, (request, response) => {
+  return response.json({ isAdmin: isAdmin(process.env, request.user.id) });
+});
+
+app.get("/api/admin/customers", authenticate, async (request, response) => {
+  if (!isAdmin(process.env, request.user.id)) return response.status(403).json({ error: "Acesso negado." });
+  try {
+    return response.json({ customers: await listAdminCustomers(process.env) });
+  } catch (error) {
+    const result = adminError(error);
+    return response.status(result.status).json({ error: result.message });
+  }
+});
+
+app.post("/api/admin/refund", authenticate, async (request, response) => {
+  if (!isAdmin(process.env, request.user.id)) return response.status(403).json({ error: "Acesso negado." });
+  if (request.body.confirmation !== "REEMBOLSAR") {
+    return response.status(400).json({ error: "Confirmação de reembolso inválida." });
+  }
+  try {
+    return response.json(await refundAndCancel(process.env, request.body.ownerId, request.user.id));
+  } catch (error) {
+    const result = adminError(error);
+    return response.status(result.status).json({ error: result.message });
   }
 });
 
