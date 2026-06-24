@@ -12,5 +12,6 @@ export function onRequestGet({ env }) {
     supabaseUrl,
     supabaseAnonKey,
     appUrl: env.PUBLIC_APP_URL || new URL("https://shackmenu.com").origin,
+    mercadoPagoTestMode: String(env.MP_CHECKOUT_TEST_MODE || env.MP_USE_TEST_KEYS || "").toLowerCase() === "true",
   });
 }

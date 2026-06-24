@@ -81,6 +81,7 @@ app.get("/api/config", (_request, response) => {
     supabaseUrl,
     supabaseAnonKey,
     appUrl: process.env.PUBLIC_APP_URL || `${_request.protocol}://${_request.get("host")}`,
+    mercadoPagoTestMode: String(process.env.MP_CHECKOUT_TEST_MODE || process.env.MP_USE_TEST_KEYS || "").toLowerCase() === "true",
   });
 });
 

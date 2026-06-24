@@ -139,6 +139,7 @@ const ordersCount = document.querySelector("#orders-count");
 
 let supabase;
 let applicationUrl = window.location.origin;
+let mercadoPagoTestMode = false;
 let currentUser;
 let currentRestaurant;
 let categories = [];
@@ -1058,7 +1059,7 @@ function renderPublicMenu(menu) {
   publicRestaurantLogo.classList.add("hidden");
   publicWhatsapp.classList.add("hidden");
   publicInstagram.classList.add("hidden");
-  const onlineCheckoutActive = Boolean(menu.restaurant.payment_online_active);
+  const onlineCheckoutActive = Boolean(menu.restaurant.payment_online_active || mercadoPagoTestMode);
   const canOrder = Boolean(menu.restaurant.whatsapp_number || onlineCheckoutActive);
   publicCartButton.classList.toggle("hidden", !canOrder);
   publicCartCheckout.classList.toggle("hidden", !onlineCheckoutActive);
@@ -1334,6 +1335,7 @@ async function init() {
 
     supabase = createClient(config.supabaseUrl, config.supabaseAnonKey);
     applicationUrl = config.appUrl || window.location.origin;
+    mercadoPagoTestMode = Boolean(config.mercadoPagoTestMode);
     const publicSlug = getPublicMenuPath();
     const customMenuDomain = getCustomMenuDomain();
     if (publicSlug || customMenuDomain) {

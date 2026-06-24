@@ -52,7 +52,16 @@ MP_PUBLIC_PROD=APP_USR-...
 MP_TOKEN_PROD=APP_USR-...
 MP_CLIENT_ID=123456789
 MP_CLIENT_SECRET=...
+MP_CHECKOUT_TEST_MODE=false
 ```
+
+Para validar cartões e webhooks com as credenciais `TEST-*`, defina temporariamente:
+
+```env
+MP_CHECKOUT_TEST_MODE=true
+```
+
+Nesse modo, o checkout usa `MP_TOKEN` de teste e não representa repasse real ao lojista.
 
 No painel da aplicação Mercado Pago, configure a Redirect URL exatamente como:
 

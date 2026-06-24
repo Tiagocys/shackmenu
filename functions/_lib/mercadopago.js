@@ -1,14 +1,26 @@
 import { supabaseAdminRequest } from "./supabase.js";
 
 function getMercadoPagoToken(env) {
-  const token = env.MP_TOKEN_PROD
-    || env.MERCADO_PAGO_ACCESS_TOKEN_PROD
-    || env.MERCADOPAGO_ACCESS_TOKEN_PROD
-    || env.MP_TOKEN
-    || env.MERCADO_PAGO_ACCESS_TOKEN
-    || env.MERCADOPAGO_ACCESS_TOKEN;
+  const testMode = isMercadoPagoTestMode(env);
+  const token = testMode
+    ? env.MP_TOKEN
+      || env.MERCADO_PAGO_ACCESS_TOKEN
+      || env.MERCADOPAGO_ACCESS_TOKEN
+      || env.MP_TOKEN_PROD
+      || env.MERCADO_PAGO_ACCESS_TOKEN_PROD
+      || env.MERCADOPAGO_ACCESS_TOKEN_PROD
+    : env.MP_TOKEN_PROD
+      || env.MERCADO_PAGO_ACCESS_TOKEN_PROD
+      || env.MERCADOPAGO_ACCESS_TOKEN_PROD
+      || env.MP_TOKEN
+      || env.MERCADO_PAGO_ACCESS_TOKEN
+      || env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) throw new Error("Mercado Pago não está configurado.");
   return token;
+}
+
+export function isMercadoPagoTestMode(env) {
+  return String(env.MP_CHECKOUT_TEST_MODE || env.MP_USE_TEST_KEYS || "").toLowerCase() === "true";
 }
 
 function getMercadoPagoClientId(env) {
@@ -267,7 +279,8 @@ export function publicMercadoPagoStatus(account) {
 }
 
 export async function createMercadoPagoPreference(env, { order, restaurant, items, customerEmail, origin, returnUrl }) {
-  const account = await getValidMercadoPagoAccount(env, restaurant.id);
+  const testMode = isMercadoPagoTestMode(env);
+  const account = testMode ? null : await getValidMercadoPagoAccount(env, restaurant.id);
   const baseUrl = env.PUBLIC_APP_URL || origin;
   const backUrl = new URL(returnUrl || `/m/${restaurant.slug}`, baseUrl);
   const successUrl = new URL(backUrl);
@@ -279,7 +292,7 @@ export async function createMercadoPagoPreference(env, { order, restaurant, item
 
   const preference = await mercadoPagoRequest(env, "/checkout/preferences", {
     method: "POST",
-    accessToken: account.access_token,
+    accessToken: testMode ? getMercadoPagoToken(env) : account.access_token,
     body: {
       external_reference: order.id,
       statement_descriptor: "SHACK MENU",
@@ -290,7 +303,9 @@ export async function createMercadoPagoPreference(env, { order, restaurant, item
         pending: pendingUrl.toString(),
       },
       auto_return: "approved",
-      marketplace_fee: order.platform_fee_cents > 0 ? centsToAmount(order.platform_fee_cents) : undefined,
+      marketplace_fee: !testMode && order.platform_fee_cents > 0
+        ? centsToAmount(order.platform_fee_cents)
+        : undefined,
       payer: { email: customerEmail },
       items: items.map((item) => ({
         id: item.product_id,
