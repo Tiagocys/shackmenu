@@ -32,8 +32,45 @@ async function mercadoPagoRequest(env, path, { method = "GET", body, accessToken
   return data;
 }
 
+async function mercadoPagoFormRequest(env, path, body) {
+  const response = await fetch(`https://api.mercadopago.com${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getMercadoPagoToken(env)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams(body),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || data.error || `Mercado Pago request failed (${response.status})`);
+  }
+  return data;
+}
+
 function centsToAmount(cents) {
   return Number((cents / 100).toFixed(2));
+}
+
+function base64UrlEncode(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function createPkceChallenge() {
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  const verifier = base64UrlEncode(randomBytes);
+  const digest = new Uint8Array(await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  ));
+  return {
+    verifier,
+    challenge: base64UrlEncode(digest),
+  };
 }
 
 function getMercadoPagoRedirectUri(env, origin) {
@@ -90,20 +127,18 @@ async function getValidMercadoPagoAccount(env, restaurantId) {
     return account;
   }
   if (!account.refresh_token) throw new Error("Conexão Mercado Pago expirada.");
-  const credentials = await mercadoPagoRequest(env, "/oauth/token", {
-    method: "POST",
-    body: {
-      client_id: getMercadoPagoClientId(env),
-      client_secret: getMercadoPagoToken(env),
-      grant_type: "refresh_token",
-      refresh_token: account.refresh_token,
-    },
+  const credentials = await mercadoPagoFormRequest(env, "/oauth/token", {
+    client_id: getMercadoPagoClientId(env),
+    client_secret: getMercadoPagoToken(env),
+    grant_type: "refresh_token",
+    refresh_token: account.refresh_token,
   });
   return saveMercadoPagoAccount(env, account.restaurant_id, account.owner_id, credentials);
 }
 
 export async function createMercadoPagoOnboardingUrl(env, user, restaurant, origin) {
   const state = crypto.randomUUID();
+  const pkce = await createPkceChallenge();
   await supabaseAdminRequest(env, "rest/v1/mercado_pago_oauth_states", {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -111,6 +146,7 @@ export async function createMercadoPagoOnboardingUrl(env, user, restaurant, orig
       state,
       owner_id: user.id,
       restaurant_id: restaurant.id,
+      code_verifier: pkce.verifier,
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     }),
   });
@@ -121,6 +157,8 @@ export async function createMercadoPagoOnboardingUrl(env, user, restaurant, orig
   url.searchParams.set("platform_id", "mp");
   url.searchParams.set("state", state);
   url.searchParams.set("redirect_uri", getMercadoPagoRedirectUri(env, origin));
+  url.searchParams.set("code_challenge", pkce.challenge);
+  url.searchParams.set("code_challenge_method", "S256");
   return url.toString();
 }
 
@@ -134,17 +172,17 @@ export async function completeMercadoPagoOnboarding(env, { code, state, origin }
     throw new Error("Estado OAuth inválido ou expirado.");
   }
 
-  const credentials = await mercadoPagoRequest(env, "/oauth/token", {
-    method: "POST",
-    body: {
-      client_id: getMercadoPagoClientId(env),
-      client_secret: getMercadoPagoToken(env),
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: getMercadoPagoRedirectUri(env, origin),
-      test_token: env.MP_OAUTH_TEST_TOKEN === "true" ? "true" : "false",
-    },
-  });
+  const tokenBody = {
+    client_id: getMercadoPagoClientId(env),
+    client_secret: getMercadoPagoToken(env),
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: getMercadoPagoRedirectUri(env, origin),
+  };
+  if (record.code_verifier) tokenBody.code_verifier = record.code_verifier;
+  if (env.MP_OAUTH_TEST_TOKEN === "true") tokenBody.test_token = "true";
+
+  const credentials = await mercadoPagoFormRequest(env, "/oauth/token", tokenBody);
 
   const account = await saveMercadoPagoAccount(env, record.restaurant_id, record.owner_id, credentials);
   await supabaseAdminRequest(

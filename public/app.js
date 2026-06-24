@@ -1369,8 +1369,8 @@ async function init() {
       window.history.replaceState({}, "", window.location.pathname);
       await openOrders();
       ordersSuccess.textContent = connectStatus === "return"
-        ? "Retorno da Stripe recebido. O status dos recebimentos foi atualizado."
-        : "Link da Stripe expirado. Gere um novo link para continuar o onboarding.";
+        ? "Mercado Pago conectado. O status dos recebimentos foi atualizado."
+        : "Link do Mercado Pago expirado. Gere um novo link para continuar o onboarding.";
       ordersSuccess.classList.remove("hidden");
     }
 
