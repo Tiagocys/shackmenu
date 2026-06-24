@@ -31,14 +31,50 @@ STRIPE_PRO_PRICE_ID=price_1Tkc1CDFdXiucib2AQXXhqOx
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-O webhook de produção é `https://shackmenu-axb.pages.dev/api/billing/webhook` e recebe:
+O webhook de produção é `https://shackmenu.com/api/billing/webhook` e recebe:
 
 - `checkout.session.completed`
+- `checkout.session.async_payment_failed`
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
 O `STRIPE_WEBHOOK_SECRET` é obrigatório no Pages e, para testes locais de webhook, pode ser gerado com o Stripe CLI. Nunca envie `STRIPE_SECRET`, `STRIPE_WEBHOOK_SECRET` ou a service role ao frontend.
+
+## Mercado Pago OAuth e pedidos
+
+Pedidos pagos online usam Mercado Pago Checkout Pro com OAuth por lojista. Cada restaurante precisa
+conectar a própria conta Mercado Pago na tela **Pedidos** antes do checkout online aparecer no cardápio.
+Assim o pagamento cai direto na conta Mercado Pago do lojista.
+
+```env
+MP_PUBLIC=TEST-...
+MP_TOKEN=TEST-...
+MP_CLIENT_ID=123456789
+```
+
+No painel da aplicação Mercado Pago, configure a Redirect URL exatamente como:
+
+```txt
+https://shackmenu.com/api/mercadopago/callback
+```
+
+O webhook do Mercado Pago é enviado por preferência para:
+
+```txt
+https://shackmenu.com/api/orders/mercadopago/webhook
+```
+
+O Shack Menu usa o `access_token` OAuth do vendedor para criar a preferência e envia
+`marketplace_fee` no plano gratuito.
+
+No plano gratuito, o Shack Menu retém taxa de plataforma sobre pedidos pagos online. Configure:
+
+```env
+ORDER_PLATFORM_FEE_PERCENT=15
+```
+
+Valores entre `15` e `20` são aceitos. No plano Pro, a taxa Shack Menu é sempre zero.
 
 O `google_id_client` e o `google_oauth_secret` não são consumidos pela aplicação. Eles devem ser cadastrados diretamente no provedor Google do Supabase. A aplicação usa apenas a chave pública `SUPABASE_ANON_KEY`; nenhuma chave secreta é enviada ao navegador.
 

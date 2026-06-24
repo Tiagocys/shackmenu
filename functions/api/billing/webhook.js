@@ -1,4 +1,5 @@
 import { json } from "../../_lib/http.js";
+import { markOrderPaymentConfirmed, markOrderPaymentFailed } from "../../_lib/orders.js";
 import { stripeRequest, syncSubscription, verifyStripeWebhook } from "../../_lib/stripe.js";
 
 export async function onRequestPost({ request, env }) {
@@ -12,9 +13,17 @@ export async function onRequestPost({ request, env }) {
 
   const event = JSON.parse(payload);
   try {
-    if (event.type === "checkout.session.completed" && event.data.object.subscription) {
-      const subscription = await stripeRequest(env, `/subscriptions/${event.data.object.subscription}`);
-      await syncSubscription(subscription, env);
+    if (event.type === "checkout.session.completed") {
+      if (event.data.object.subscription) {
+        const subscription = await stripeRequest(env, `/subscriptions/${event.data.object.subscription}`);
+        await syncSubscription(subscription, env);
+      } else if (event.data.object.mode === "payment") {
+        await markOrderPaymentConfirmed(env, event.data.object);
+      }
+    }
+
+    if (event.type === "checkout.session.async_payment_failed") {
+      await markOrderPaymentFailed(env, event.data.object);
     }
 
     if ([

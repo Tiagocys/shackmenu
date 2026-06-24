@@ -19,6 +19,24 @@ export async function stripeRequest(env, path, parameters) {
   return data;
 }
 
+export async function stripeJsonRequest(env, path, body, options = {}) {
+  const secret = env.STRIPE_SECRET;
+  if (!secret) throw new Error("STRIPE_SECRET is not configured");
+
+  const response = await fetch(`https://api.stripe.com${path}`, {
+    method: body ? "POST" : "GET",
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      "Stripe-Version": options.apiVersion || "2026-05-27.preview",
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error?.message || "Stripe request failed");
+  return data;
+}
+
 export async function getUserSubscription(request, env, ownerId) {
   const supabaseUrl = env.SUPABASE_URL || env.project_url;
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");

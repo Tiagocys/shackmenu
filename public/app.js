@@ -10,6 +10,7 @@ const views = {
   settings: document.querySelector("#settings-view"),
   upgrade: document.querySelector("#upgrade-view"),
   admin: document.querySelector("#admin-view"),
+  orders: document.querySelector("#orders-view"),
   publicMenu: document.querySelector("#public-menu-view"),
 };
 
@@ -19,6 +20,7 @@ const supportFooter = document.querySelector("#platform-support-footer");
 const supportEmail = document.querySelector("#support-email");
 const copySupportEmail = document.querySelector("#copy-support-email");
 const adminButton = document.querySelector("#admin-menu");
+const ordersButton = document.querySelector("#orders-menu");
 const upgradeButton = document.querySelector("#upgrade-menu");
 const customizeButton = document.querySelector("#customize-menu");
 const signOutButton = document.querySelector("#sign-out");
@@ -77,7 +79,11 @@ const publicCartItems = document.querySelector("#public-cart-items");
 const publicCartEmpty = document.querySelector("#public-cart-empty");
 const publicCartSummary = document.querySelector("#public-cart-summary");
 const publicCartTotal = document.querySelector("#public-cart-total");
+const publicCustomerName = document.querySelector("#public-customer-name");
+const publicCustomerEmail = document.querySelector("#public-customer-email");
+const publicCustomerPhone = document.querySelector("#public-customer-phone");
 const publicOrderNotes = document.querySelector("#public-order-notes");
+const publicCartCheckout = document.querySelector("#public-cart-checkout");
 const publicCartSend = document.querySelector("#public-cart-send");
 const settingsBack = document.querySelector("#settings-back");
 const settingsForm = document.querySelector("#settings-form");
@@ -120,6 +126,16 @@ const adminRefresh = document.querySelector("#admin-refresh");
 const adminCustomers = document.querySelector("#admin-customers");
 const adminError = document.querySelector("#admin-error");
 const adminSuccess = document.querySelector("#admin-success");
+const ordersBack = document.querySelector("#orders-back");
+const ordersRefresh = document.querySelector("#orders-refresh");
+const ordersError = document.querySelector("#orders-error");
+const ordersSuccess = document.querySelector("#orders-success");
+const connectCard = document.querySelector("#connect-card");
+const connectTitle = document.querySelector("#connect-title");
+const connectCopy = document.querySelector("#connect-copy");
+const connectOnboarding = document.querySelector("#connect-onboarding");
+const ordersList = document.querySelector("#orders-list");
+const ordersCount = document.querySelector("#orders-count");
 
 let supabase;
 let applicationUrl = window.location.origin;
@@ -140,6 +156,7 @@ let activeViewName = "loading";
 let settingsReturnView = "items";
 let upgradeReturnView = "items";
 let adminReturnView = "items";
+let ordersReturnView = "items";
 let adminAccess = false;
 let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 let activePublicMenu = null;
@@ -153,6 +170,7 @@ function showView(name) {
   signOutButton.classList.toggle("hidden", publicView);
   supportFooter.classList.toggle("hidden", name === "loading" || name === "publicMenu");
   adminButton.classList.toggle("hidden", publicView || name === "admin" || !adminAccess);
+  ordersButton.classList.toggle("hidden", publicView || name === "orders" || name === "restaurant" || !currentRestaurant);
   customizeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "settings" || !currentRestaurant);
   upgradeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "upgrade" || !currentRestaurant);
   upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
@@ -277,6 +295,115 @@ async function openAdmin() {
   adminSuccess.classList.add("hidden");
   showView("admin");
   await loadAdminCustomers();
+}
+
+function renderConnectStatus(payment = {}) {
+  connectOnboarding.classList.remove("hidden");
+  const status = payment.status || "not_started";
+  const active = status === "active" && payment.chargesEnabled;
+  connectCard.classList.toggle("connect-card-active", active);
+  connectCard.classList.toggle("connect-card-pending", !active);
+  connectTitle.textContent = active ? "Pagamento online ativo" : payment.label || "Onboarding pendente";
+  connectCopy.textContent = active
+    ? "Seu cardápio pode receber pedidos pagos online com Pix, cartão e outros meios disponíveis na sua conta Mercado Pago."
+    : "Conecte a conta Mercado Pago do restaurante para liberar checkout online. Sem isso, os pedidos continuam apenas pelo WhatsApp.";
+  connectOnboarding.textContent = active ? "Reconectar Mercado Pago" : "Conectar Mercado Pago";
+}
+
+function renderOrderStatus(status) {
+  const labels = {
+    awaiting_payment: "Aguardando pagamento",
+    payment_confirmed: "Pago",
+    payment_failed: "Pagamento falhou",
+    cancelled: "Cancelado",
+  };
+  return labels[status] || status;
+}
+
+function renderOrders(orders) {
+  ordersList.replaceChildren();
+  ordersCount.textContent = `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"}`;
+  if (!orders.length) {
+    const empty = document.createElement("p");
+    empty.className = "category-empty";
+    empty.textContent = "Nenhum pedido online recebido ainda.";
+    ordersList.append(empty);
+    return;
+  }
+
+  orders.forEach((order) => {
+    const item = document.createElement("article");
+    item.className = "order-card";
+
+    const header = document.createElement("div");
+    header.className = "order-card-header";
+    const title = document.createElement("strong");
+    title.textContent = `Pedido #${order.order_number}`;
+    const status = document.createElement("span");
+    status.className = `order-status order-status-${order.status}`;
+    status.textContent = renderOrderStatus(order.status);
+    header.append(title, status);
+
+    const customer = document.createElement("p");
+    customer.textContent = `${order.customer_name} • ${order.customer_email || "sem e-mail"}`;
+
+    const products = document.createElement("ul");
+    products.className = "order-items";
+    (order.items || []).forEach((entry) => {
+      const line = document.createElement("li");
+      line.textContent = `${entry.quantity}x ${entry.name} — ${formatPrice(entry.subtotal_cents)}`;
+      products.append(line);
+    });
+
+    const totals = document.createElement("div");
+    totals.className = "order-totals";
+    const subtotal = document.createElement("span");
+    subtotal.textContent = `Subtotal ${formatPrice(order.subtotal_cents)}`;
+    const fee = document.createElement("span");
+    fee.textContent = order.platform_fee_percent > 0
+      ? `Taxa Shack Menu ${order.platform_fee_percent}%: ${formatPrice(order.platform_fee_cents)}`
+      : "Sem taxa Shack Menu";
+    totals.append(subtotal, fee);
+
+    if (order.notes) {
+      const notes = document.createElement("p");
+      notes.className = "order-notes";
+      notes.textContent = `Observações: ${order.notes}`;
+      item.append(header, customer, products, totals, notes);
+    } else {
+      item.append(header, customer, products, totals);
+    }
+    ordersList.append(item);
+  });
+}
+
+async function loadOrders() {
+  ordersError.classList.add("hidden");
+  ordersRefresh.disabled = true;
+  ordersRefresh.textContent = "Atualizando...";
+  try {
+    const [connectResult, ordersResult] = await Promise.all([
+      authenticatedApi("/api/connect/status"),
+      authenticatedApi("/api/orders"),
+    ]);
+    renderConnectStatus(connectResult.payment);
+    renderOrders(ordersResult.orders || []);
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+  } finally {
+    ordersRefresh.disabled = false;
+    ordersRefresh.textContent = "Atualizar";
+  }
+}
+
+async function openOrders() {
+  ordersReturnView = activeViewName === "orders" ? "items" : activeViewName;
+  ordersError.classList.add("hidden");
+  ordersSuccess.classList.add("hidden");
+  showView("orders");
+  await loadOrders();
 }
 
 function showError(message) {
@@ -820,6 +947,55 @@ function sendPublicCartToWhatsapp() {
   window.open(`https://wa.me/${activePublicMenu.restaurant.whatsapp_number}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank", "noopener");
 }
 
+function getPublicCustomerPayload() {
+  return {
+    customerName: publicCustomerName.value.trim(),
+    customerEmail: publicCustomerEmail.value.trim(),
+    customerPhone: publicCustomerPhone.value.trim(),
+    notes: publicOrderNotes.value.trim(),
+  };
+}
+
+async function checkoutPublicCart() {
+  const details = getPublicCartDetails();
+  if (!activePublicMenu?.restaurant?.id || !details.length) return;
+
+  const customer = getPublicCustomerPayload();
+  if (customer.customerName.length < 2) {
+    publicCustomerName.focus();
+    alert("Informe seu nome para identificar o pedido.");
+    return;
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customer.customerEmail)) {
+    publicCustomerEmail.focus();
+    alert("Informe um e-mail válido para o pagamento online.");
+    return;
+  }
+
+  publicCartCheckout.disabled = true;
+  publicCartCheckout.innerHTML = '<span class="button-spinner"></span> Abrindo pagamento...';
+  try {
+    const response = await fetch("/api/orders/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        restaurantId: activePublicMenu.restaurant.id,
+        items: publicCart,
+        returnUrl: window.location.href,
+        ...customer,
+      }),
+    });
+    const result = await readApiResponse(response);
+    if (!response.ok) throw new Error(result.error || "Não foi possível iniciar o pagamento.");
+    window.location.assign(result.url);
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Não foi possível iniciar o pagamento.");
+    publicCartCheckout.disabled = false;
+    publicCartCheckout.textContent = "Pagar online";
+  }
+}
+
 function createPublicProductCard(product) {
   const card = document.createElement("article");
   card.className = "public-product-card";
@@ -849,7 +1025,7 @@ function createPublicProductCard(product) {
     body.append(description);
   }
 
-  if (activePublicMenu?.restaurant.whatsapp_number) {
+  if (activePublicMenu?.restaurant.whatsapp_number || activePublicMenu?.restaurant.payment_online_active) {
     const addButton = document.createElement("button");
     addButton.className = "public-product-add";
     addButton.type = "button";
@@ -882,7 +1058,11 @@ function renderPublicMenu(menu) {
   publicRestaurantLogo.classList.add("hidden");
   publicWhatsapp.classList.add("hidden");
   publicInstagram.classList.add("hidden");
-  publicCartButton.classList.toggle("hidden", !menu.restaurant.whatsapp_number);
+  const onlineCheckoutActive = Boolean(menu.restaurant.payment_online_active);
+  const canOrder = Boolean(menu.restaurant.whatsapp_number || onlineCheckoutActive);
+  publicCartButton.classList.toggle("hidden", !canOrder);
+  publicCartCheckout.classList.toggle("hidden", !onlineCheckoutActive);
+  publicCartSend.classList.toggle("hidden", !menu.restaurant.whatsapp_number);
 
   if (menu.restaurant.logo_key) {
     publicRestaurantLogo.src = `/api/media?key=${encodeURIComponent(menu.restaurant.logo_key)}`;
@@ -927,6 +1107,16 @@ function renderPublicMenu(menu) {
     publicMenuContent.append(empty);
   }
 
+  const orderStatus = new URLSearchParams(window.location.search).get("order");
+  if (orderStatus === "success") {
+    publicCart = [];
+    savePublicCart();
+    window.history.replaceState({}, "", window.location.pathname);
+    window.setTimeout(() => alert("Pagamento recebido. O restaurante verá o pedido no painel assim que a Stripe confirmar."), 200);
+  } else if (orderStatus === "cancelled") {
+    window.history.replaceState({}, "", window.location.pathname);
+    window.setTimeout(() => alert("Pagamento não concluído. Seu pedido continua no carrinho."), 200);
+  }
   renderPublicCart();
 }
 
@@ -1174,6 +1364,16 @@ async function init() {
       }
     }
 
+    const connectStatus = new URLSearchParams(window.location.search).get("connect");
+    if (currentRestaurant && connectStatus) {
+      window.history.replaceState({}, "", window.location.pathname);
+      await openOrders();
+      ordersSuccess.textContent = connectStatus === "return"
+        ? "Retorno da Stripe recebido. O status dos recebimentos foi atualizado."
+        : "Link da Stripe expirado. Gere um novo link para continuar o onboarding.";
+      ordersSuccess.classList.remove("hidden");
+    }
+
     supabase.auth.onAuthStateChange((event, session) => {
       const newLogin = event === "SIGNED_IN" && !currentUser;
       if (newLogin || event === "SIGNED_OUT") {
@@ -1200,13 +1400,33 @@ loginButton.addEventListener("click", async () => {
 
 signOutButton.addEventListener("click", () => supabase.auth.signOut());
 adminButton.addEventListener("click", openAdmin);
+ordersButton.addEventListener("click", openOrders);
 customizeButton.addEventListener("click", openSettings);
 upgradeButton.addEventListener("click", handlePlanButton);
 quotaUpgrade.addEventListener("click", openUpgrade);
 settingsBack.addEventListener("click", () => showView(settingsReturnView));
 adminBack.addEventListener("click", () => showView(adminReturnView));
 adminRefresh.addEventListener("click", loadAdminCustomers);
+ordersBack.addEventListener("click", () => showView(ordersReturnView));
+ordersRefresh.addEventListener("click", loadOrders);
 upgradeBack.addEventListener("click", () => showView(upgradeReturnView));
+
+connectOnboarding.addEventListener("click", async () => {
+  ordersError.classList.add("hidden");
+  ordersSuccess.classList.add("hidden");
+  connectOnboarding.disabled = true;
+  connectOnboarding.innerHTML = '<span class="button-spinner"></span> Abrindo Stripe...';
+  try {
+    const result = await authenticatedApi("/api/connect/onboarding", { method: "POST" });
+    window.location.assign(result.url);
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+    connectOnboarding.disabled = false;
+    connectOnboarding.textContent = "Configurar recebimentos";
+  }
+});
 
 adminCustomers.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-refund-owner]");
@@ -1279,6 +1499,7 @@ publicCartOverlay.addEventListener("click", (event) => {
   if (event.target === publicCartOverlay) closePublicCart();
 });
 publicCartSend.addEventListener("click", sendPublicCartToWhatsapp);
+publicCartCheckout.addEventListener("click", checkoutPublicCart);
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !publicCartOverlay.classList.contains("hidden")) closePublicCart();
 });

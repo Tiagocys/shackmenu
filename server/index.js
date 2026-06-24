@@ -18,6 +18,23 @@ import {
   refreshCustomDomain,
 } from "../functions/_lib/domains.js";
 import {
+  getOwnerRestaurant,
+} from "../functions/_lib/connect.js";
+import {
+  createMercadoPagoOrderCheckoutSession,
+  listOwnerOrders,
+  markOrderPaymentConfirmed,
+  markOrderPaymentFailed,
+} from "../functions/_lib/orders.js";
+import {
+  getMercadoPagoPaymentForOrder,
+  completeMercadoPagoOnboarding,
+  createMercadoPagoOnboardingUrl,
+  getOwnerMercadoPagoAccount,
+  publicMercadoPagoStatus,
+  syncMercadoPagoPayment,
+} from "../functions/_lib/mercadopago.js";
+import {
   getUserSubscription,
   stripeRequest,
   syncSubscription,
@@ -250,9 +267,16 @@ app.post("/api/billing/webhook", async (request, response) => {
 
   try {
     const event = JSON.parse(payload);
-    if (event.type === "checkout.session.completed" && event.data.object.subscription) {
-      const subscription = await stripeRequest(process.env, `/subscriptions/${event.data.object.subscription}`);
-      await syncSubscription(subscription, process.env);
+    if (event.type === "checkout.session.completed") {
+      if (event.data.object.subscription) {
+        const subscription = await stripeRequest(process.env, `/subscriptions/${event.data.object.subscription}`);
+        await syncSubscription(subscription, process.env);
+      } else if (event.data.object.mode === "payment") {
+        await markOrderPaymentConfirmed(process.env, event.data.object);
+      }
+    }
+    if (event.type === "checkout.session.async_payment_failed") {
+      await markOrderPaymentFailed(process.env, event.data.object);
     }
     if ([
       "customer.subscription.created",
@@ -265,6 +289,104 @@ app.post("/api/billing/webhook", async (request, response) => {
   } catch (error) {
     console.error("Stripe webhook processing failed", error);
     return response.status(500).json({ error: "Falha ao processar webhook." });
+  }
+});
+
+app.get("/api/connect/status", authenticate, async (request, response) => {
+  try {
+    const restaurant = await getOwnerRestaurant(process.env, request.user.id);
+    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
+    const account = await getOwnerMercadoPagoAccount(process.env, request.user.id);
+    return response.json({ payment: publicMercadoPagoStatus(account) });
+  } catch (error) {
+    console.error("Could not read Mercado Pago status", error);
+    return response.status(500).json({ error: "Não foi possível comunicar com o Mercado Pago." });
+  }
+});
+
+app.post("/api/connect/onboarding", authenticate, async (request, response) => {
+  try {
+    const restaurant = await getOwnerRestaurant(process.env, request.user.id);
+    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
+    const url = await createMercadoPagoOnboardingUrl(
+      process.env,
+      request.user,
+      restaurant,
+      process.env.PUBLIC_APP_URL || `${request.protocol}://${request.get("host")}`,
+    );
+    return response.json({ url });
+  } catch (error) {
+    console.error("Could not create Mercado Pago onboarding", error);
+    return response.status(500).json({ error: "Não foi possível comunicar com o Mercado Pago." });
+  }
+});
+
+app.get("/api/mercadopago/callback", async (request, response) => {
+  const origin = process.env.PUBLIC_APP_URL || `${request.protocol}://${request.get("host")}`;
+  const { code, state, error } = request.query;
+  if (error || !code || !state) return response.redirect(302, `${origin}/?connect=refresh`);
+  try {
+    await completeMercadoPagoOnboarding(process.env, {
+      code: String(code),
+      state: String(state),
+      origin,
+    });
+    return response.redirect(302, `${origin}/?connect=return`);
+  } catch (callbackError) {
+    console.error("Mercado Pago OAuth callback failed", callbackError);
+    return response.redirect(302, `${origin}/?connect=refresh`);
+  }
+});
+
+app.post("/api/orders/checkout", async (request, response) => {
+  try {
+    const result = await createMercadoPagoOrderCheckoutSession(
+      process.env,
+      request.body,
+      `${request.protocol}://${request.get("host")}`,
+    );
+    return response.json(result);
+  } catch (error) {
+    console.error("Could not create order checkout", error);
+    const expected = [
+      "Cardápio não encontrado.",
+      "Este restaurante ainda não liberou pagamento online.",
+      "Pedido vazio.",
+      "Nenhum produto válido encontrado.",
+      "Informe o nome para o pedido.",
+      "Informe um e-mail válido.",
+      "Mercado Pago não está configurado.",
+    ];
+    return response.status(expected.includes(error.message) ? 400 : 500).json({
+      error: expected.includes(error.message)
+        ? error.message
+        : "Não foi possível comunicar com o Mercado Pago.",
+    });
+  }
+});
+
+app.post("/api/orders/mercadopago/webhook", async (request, response) => {
+  const payload = request.body || {};
+  const type = payload.type || payload.topic || request.query.type || request.query.topic;
+  const paymentId = payload.data?.id || payload.id || request.query["data.id"] || request.query.id;
+  try {
+    if (type !== "payment") return response.json({ received: true });
+    if (!paymentId) return response.status(400).json({ error: "Pagamento não informado." });
+    const payment = await getMercadoPagoPaymentForOrder(process.env, paymentId);
+    await syncMercadoPagoPayment(process.env, payment);
+    return response.json({ received: true });
+  } catch (error) {
+    console.error("Mercado Pago webhook processing failed", error);
+    return response.status(500).json({ error: "Falha ao processar webhook do Mercado Pago." });
+  }
+});
+
+app.get("/api/orders", authenticate, async (request, response) => {
+  try {
+    return response.json({ orders: await listOwnerOrders(process.env, request.user.id) });
+  } catch (error) {
+    console.error("Could not list orders", error);
+    return response.status(500).json({ error: "Não foi possível carregar os pedidos." });
   }
 });
 

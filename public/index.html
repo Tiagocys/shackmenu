@@ -18,6 +18,7 @@
     </a>
     <div class="header-actions">
       <button id="admin-menu" class="button button-ghost hidden" type="button">Administrar</button>
+      <button id="orders-menu" class="button button-ghost hidden" type="button">Pedidos</button>
       <button id="upgrade-menu" class="button button-upgrade hidden" type="button">Upgrade</button>
       <button id="customize-menu" class="button button-ghost hidden" type="button">Personalizar</button>
       <button id="sign-out" class="button button-ghost hidden" type="button">Sair</button>
@@ -370,7 +371,7 @@
               <li>Até 200 produtos</li>
               <li>Sem a marca “Feito com Shack Menu”</li>
               <li>Domínio próprio com SSL</li>
-              <li>Pedidos pelo cardápio <small>em breve</small></li>
+              <li>Pedidos pelo cardápio</li>
               <li>Cupons e produtos em destaque <small>em breve</small></li>
               <li>QR Code e importação por planilha <small>em breve</small></li>
             </ul>
@@ -397,6 +398,37 @@
         <p id="admin-error" class="form-error hidden" role="alert"></p>
         <p id="admin-success" class="form-success hidden" role="status"></p>
         <div id="admin-customers" class="admin-customers"></div>
+      </div>
+    </section>
+
+    <section id="orders-view" class="orders-view hidden">
+      <div class="orders-shell">
+        <div class="orders-heading">
+          <div>
+            <span class="eyebrow">Pedidos</span>
+            <h1>Pagamentos e pedidos recebidos.</h1>
+            <p>Confira pedidos pagos e a situação do checkout online.</p>
+          </div>
+          <div class="admin-heading-actions">
+            <button id="orders-refresh" class="button button-ghost" type="button">Atualizar</button>
+            <button id="orders-back" class="button button-ghost" type="button">← Voltar</button>
+          </div>
+        </div>
+        <p id="orders-error" class="form-error hidden" role="alert"></p>
+        <p id="orders-success" class="form-success hidden" role="status"></p>
+        <article id="connect-card" class="connect-card">
+          <div>
+            <span class="pricing-label">Recebimentos</span>
+            <h2 id="connect-title">Pagamentos não configurados</h2>
+            <p id="connect-copy">Conecte a conta Mercado Pago do restaurante para liberar pagamento online no cardápio.</p>
+          </div>
+          <button id="connect-onboarding" class="button button-primary" type="button">Conectar Mercado Pago</button>
+        </article>
+        <div class="orders-section-heading">
+          <strong>Últimos pedidos</strong>
+          <span id="orders-count">0 pedidos</span>
+        </div>
+        <div id="orders-list" class="orders-list"></div>
       </div>
     </section>
 
@@ -433,9 +465,22 @@
           <div id="public-cart-items" class="public-cart-items"></div>
           <p id="public-cart-empty" class="public-cart-empty">Seu pedido ainda está vazio.</p>
           <div id="public-cart-summary" class="public-cart-summary hidden">
+            <div class="field-group">
+              <label for="public-customer-name">Seu nome</label>
+              <input id="public-customer-name" type="text" maxlength="100" placeholder="Nome para identificar o pedido" />
+            </div>
+            <div class="field-group">
+              <label for="public-customer-email">E-mail para pagamento online</label>
+              <input id="public-customer-email" type="text" inputmode="email" maxlength="120" placeholder="voce@email.com" />
+            </div>
+            <div class="field-group">
+              <label for="public-customer-phone">Telefone <span class="optional">opcional</span></label>
+              <input id="public-customer-phone" type="tel" inputmode="tel" maxlength="20" placeholder="(11) 99999-9999" />
+            </div>
             <label for="public-order-notes">Alguma observação?</label>
             <textarea id="public-order-notes" maxlength="500" rows="3" placeholder="Ex: sem cebola, ponto da carne..." ></textarea>
             <div class="public-cart-total"><span>Subtotal</span><strong id="public-cart-total"></strong></div>
+            <button id="public-cart-checkout" class="public-cart-checkout hidden" type="button">Pagar online</button>
             <button id="public-cart-send" class="public-cart-send" type="button">
               <img src="/assets/icons/whatsapp.png" alt="" />
               Enviar pedido pelo WhatsApp
