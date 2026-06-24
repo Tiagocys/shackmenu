@@ -13,6 +13,11 @@ function normalizePhone(value) {
   return normalized.length >= 10 && normalized.length <= 15 ? `+${normalized}` : null;
 }
 
+function normalizeCpf(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 11 ? digits : null;
+}
+
 function getApplicationFeePercent(isPro, env) {
   if (isPro) return 0;
   const configured = Number(env.ORDER_PLATFORM_FEE_PERCENT || 15);
@@ -113,11 +118,29 @@ async function createOrderRecord(env, body) {
     }),
   });
   const order = orderRows[0];
-  return { restaurant, items, order, customerEmail, subtotal, platformFee };
+  return {
+    restaurant,
+    items,
+    order,
+    customerName,
+    customerEmail,
+    customerPhone: body.customerPhone,
+    customerDocument: normalizeCpf(body.customerDocument),
+    subtotal,
+    platformFee,
+  };
 }
 
 export async function createMercadoPagoOrderCheckoutSession(env, body, origin) {
-  const { restaurant, items, order, customerEmail } = await createOrderRecord(env, {
+  const {
+    restaurant,
+    items,
+    order,
+    customerName,
+    customerEmail,
+    customerPhone,
+    customerDocument,
+  } = await createOrderRecord(env, {
     ...body,
     paymentProvider: "mercado_pago",
   });
@@ -125,7 +148,10 @@ export async function createMercadoPagoOrderCheckoutSession(env, body, origin) {
     order,
     restaurant,
     items,
+    customerName,
     customerEmail,
+    customerPhone,
+    customerDocument,
     origin,
     returnUrl: body.returnUrl,
   });

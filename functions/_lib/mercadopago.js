@@ -278,7 +278,53 @@ export function publicMercadoPagoStatus(account) {
   };
 }
 
-export async function createMercadoPagoPreference(env, { order, restaurant, items, customerEmail, origin, returnUrl }) {
+function splitCustomerName(value) {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return { name: undefined, surname: undefined };
+  return {
+    name: parts[0],
+    surname: parts.slice(1).join(" ") || undefined,
+  };
+}
+
+function getBrazilPhone(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    digits = digits.slice(2);
+  }
+  if (digits.length !== 10 && digits.length !== 11) return undefined;
+  return {
+    area_code: digits.slice(0, 2),
+    number: digits.slice(2),
+  };
+}
+
+function buildPayer({ customerName, customerEmail, customerPhone, customerDocument }) {
+  const { name, surname } = splitCustomerName(customerName);
+  const phone = getBrazilPhone(customerPhone);
+  return {
+    name,
+    surname,
+    email: customerEmail,
+    phone,
+    identification: customerDocument ? {
+      type: "CPF",
+      number: customerDocument,
+    } : undefined,
+  };
+}
+
+export async function createMercadoPagoPreference(env, {
+  order,
+  restaurant,
+  items,
+  customerName,
+  customerEmail,
+  customerPhone,
+  customerDocument,
+  origin,
+  returnUrl,
+}) {
   const testMode = isMercadoPagoTestMode(env);
   const account = testMode ? null : await getValidMercadoPagoAccount(env, restaurant.id);
   const baseUrl = env.PUBLIC_APP_URL || origin;
@@ -306,7 +352,16 @@ export async function createMercadoPagoPreference(env, { order, restaurant, item
       marketplace_fee: !testMode && order.platform_fee_cents > 0
         ? centsToAmount(order.platform_fee_cents)
         : undefined,
-      payer: { email: customerEmail },
+      payer: buildPayer({
+        customerName,
+        customerEmail,
+        customerPhone,
+        customerDocument,
+      }),
+      payment_methods: {
+        installments: 1,
+        default_installments: 1,
+      },
       items: items.map((item) => ({
         id: item.product_id,
         title: item.name,
@@ -337,7 +392,9 @@ export async function createMercadoPagoPreference(env, { order, restaurant, item
 
   return {
     id: preference.id,
-    url: preference.init_point || preference.sandbox_init_point,
+    url: testMode
+      ? preference.sandbox_init_point || preference.init_point
+      : preference.init_point || preference.sandbox_init_point,
   };
 }
 

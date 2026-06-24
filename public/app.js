@@ -82,6 +82,7 @@ const publicCartTotal = document.querySelector("#public-cart-total");
 const publicCustomerName = document.querySelector("#public-customer-name");
 const publicCustomerEmail = document.querySelector("#public-customer-email");
 const publicCustomerPhone = document.querySelector("#public-customer-phone");
+const publicCustomerDocument = document.querySelector("#public-customer-document");
 const publicOrderNotes = document.querySelector("#public-order-notes");
 const publicCartCheckout = document.querySelector("#public-cart-checkout");
 const publicCartSend = document.querySelector("#public-cart-send");
@@ -953,6 +954,7 @@ function getPublicCustomerPayload() {
     customerName: publicCustomerName.value.trim(),
     customerEmail: publicCustomerEmail.value.trim(),
     customerPhone: publicCustomerPhone.value.trim(),
+    customerDocument: publicCustomerDocument.value.trim(),
     notes: publicOrderNotes.value.trim(),
   };
 }
@@ -970,6 +972,11 @@ async function checkoutPublicCart() {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customer.customerEmail)) {
     publicCustomerEmail.focus();
     alert("Informe um e-mail válido para o pagamento online.");
+    return;
+  }
+  if (customer.customerDocument && customer.customerDocument.replace(/\D/g, "").length !== 11) {
+    publicCustomerDocument.focus();
+    alert("Informe um CPF com 11 dígitos ou deixe o campo em branco.");
     return;
   }
 
