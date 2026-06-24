@@ -33,6 +33,10 @@ button { cursor: pointer; }
 .brand-mark, .card-icon { display: grid; place-items: center; color: var(--lime); background: var(--ink); transform: rotate(-4deg); font-family: Manrope, sans-serif; font-weight: 800; }
 .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
 .header-actions { display: flex; align-items: center; gap: 4px; }
+.button-orders { position: relative; }
+.orders-bell { position: relative; display: inline-flex; align-items: center; }
+.orders-bell img { width: 17px; height: 17px; }
+.orders-badge { position: absolute; top: -9px; right: -10px; min-width: 18px; height: 18px; padding: 0 5px; display: inline-grid; place-items: center; border: 2px solid var(--cream); border-radius: 999px; background: #ff4d2e; color: #fff; font-size: 10px; font-weight: 900; line-height: 1; }
 .billing-notice { position: fixed; top: 88px; left: 50%; z-index: 20; width: min(520px, calc(100% - 32px)); padding: 13px 18px; border: 1px solid #a5c52c; border-radius: 11px; background: #eff9cf; color: #36500c; box-shadow: 0 12px 35px rgba(27, 26, 23, .15); text-align: center; font-size: 13px; font-weight: 700; transform: translateX(-50%); }
 
 main { min-height: calc(100vh - 76px); }

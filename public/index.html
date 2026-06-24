@@ -18,7 +18,13 @@
     </a>
     <div class="header-actions">
       <button id="admin-menu" class="button button-ghost hidden" type="button">Administrar</button>
-      <button id="orders-menu" class="button button-ghost hidden" type="button">Pedidos</button>
+      <button id="orders-menu" class="button button-ghost button-orders hidden" type="button">
+        <span class="orders-bell">
+          <img src="/assets/icons/bell.svg" alt="" />
+          <span id="orders-badge" class="orders-badge hidden">0</span>
+        </span>
+        Pedidos
+      </button>
       <button id="upgrade-menu" class="button button-upgrade hidden" type="button">Upgrade</button>
       <button id="customize-menu" class="button button-ghost hidden" type="button">Personalizar</button>
       <button id="sign-out" class="button button-ghost hidden" type="button">Sair</button>

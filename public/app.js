@@ -21,6 +21,7 @@ const supportEmail = document.querySelector("#support-email");
 const copySupportEmail = document.querySelector("#copy-support-email");
 const adminButton = document.querySelector("#admin-menu");
 const ordersButton = document.querySelector("#orders-menu");
+const ordersBadge = document.querySelector("#orders-badge");
 const upgradeButton = document.querySelector("#upgrade-menu");
 const customizeButton = document.querySelector("#customize-menu");
 const signOutButton = document.querySelector("#sign-out");
@@ -164,6 +165,9 @@ let adminAccess = false;
 let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 let activePublicMenu = null;
 let publicCart = [];
+let lastPaidOrderId = null;
+let ordersPollTimer = null;
+let notificationAudioContext = null;
 
 const pendingPublicOrderKey = "shackmenu:pending-public-order";
 
@@ -180,6 +184,54 @@ function showView(name) {
   upgradeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "upgrade" || !currentRestaurant);
   upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
   activeViewName = name;
+}
+
+function getPaidOrders(orders) {
+  return orders.filter((order) => order.status === "payment_confirmed");
+}
+
+function updateOrdersBadge(orders = []) {
+  const count = getPaidOrders(orders).length;
+  ordersBadge.textContent = String(Math.min(count, 99));
+  ordersBadge.classList.toggle("hidden", count === 0);
+}
+
+function playOrderNotificationSound() {
+  try {
+    notificationAudioContext ||= new AudioContext();
+    const oscillator = notificationAudioContext.createOscillator();
+    const gain = notificationAudioContext.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, notificationAudioContext.currentTime);
+    oscillator.frequency.setValueAtTime(660, notificationAudioContext.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.0001, notificationAudioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.12, notificationAudioContext.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, notificationAudioContext.currentTime + 0.28);
+    oscillator.connect(gain).connect(notificationAudioContext.destination);
+    oscillator.start();
+    oscillator.stop(notificationAudioContext.currentTime + 0.3);
+  } catch (error) {
+    console.error("Could not play notification sound", error);
+  }
+}
+
+async function requestOrderNotificationPermission() {
+  if (!("Notification" in window) || Notification.permission !== "default") return;
+  try {
+    await Notification.requestPermission();
+  } catch (error) {
+    console.error("Could not request notification permission", error);
+  }
+}
+
+function notifyNewPaidOrder(order) {
+  playOrderNotificationSound();
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(`Pedido pago #${order.order_number}`, {
+      body: `${order.customer_name} - ${formatPrice(order.subtotal_cents)}`,
+      icon: "/assets/icons/bell.svg",
+    });
+  }
 }
 
 async function authenticatedApi(path, options = {}) {
@@ -328,10 +380,11 @@ function renderOrderStatus(status) {
 function renderOrders(orders) {
   ordersList.replaceChildren();
   ordersCount.textContent = `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"}`;
+  updateOrdersBadge(orders);
   ordersNotice.classList.add("hidden");
   ordersNotice.replaceChildren();
 
-  const paidOrders = orders.filter((order) => order.status === "payment_confirmed");
+  const paidOrders = getPaidOrders(orders);
   if (paidOrders.length) {
     const latest = paidOrders[0];
     ordersNotice.classList.remove("hidden");
@@ -409,6 +462,8 @@ async function loadOrders() {
     ]);
     renderConnectStatus(connectResult.payment);
     renderOrders(ordersResult.orders || []);
+    const latestPaidOrder = getPaidOrders(ordersResult.orders || [])[0];
+    if (latestPaidOrder) lastPaidOrderId = latestPaidOrder.id;
   } catch (error) {
     console.error(error);
     ordersError.textContent = error.message;
@@ -420,11 +475,42 @@ async function loadOrders() {
 }
 
 async function openOrders() {
+  await requestOrderNotificationPermission();
   ordersReturnView = activeViewName === "orders" ? "items" : activeViewName;
   ordersError.classList.add("hidden");
   ordersSuccess.classList.add("hidden");
   showView("orders");
   await loadOrders();
+}
+
+async function refreshOrdersBadge({ notify = false } = {}) {
+  if (!currentUser || !currentRestaurant) return;
+  try {
+    const result = await authenticatedApi("/api/orders");
+    const orders = result.orders || [];
+    updateOrdersBadge(orders);
+    const latestPaidOrder = getPaidOrders(orders)[0];
+    if (notify && latestPaidOrder && lastPaidOrderId && latestPaidOrder.id !== lastPaidOrderId) {
+      notifyNewPaidOrder(latestPaidOrder);
+    }
+    if (latestPaidOrder) lastPaidOrderId = latestPaidOrder.id;
+    if (activeViewName === "orders") renderOrders(orders);
+  } catch (error) {
+    console.error("Could not refresh order notifications", error);
+  }
+}
+
+function startOrdersPolling() {
+  window.clearInterval(ordersPollTimer);
+  if (!currentUser || !currentRestaurant) return;
+  refreshOrdersBadge();
+  ordersPollTimer = window.setInterval(() => refreshOrdersBadge({ notify: true }), 30000);
+}
+
+function stopOrdersPolling() {
+  window.clearInterval(ordersPollTimer);
+  ordersPollTimer = null;
+  ordersBadge.classList.add("hidden");
 }
 
 function showError(message) {
@@ -1362,6 +1448,7 @@ async function handleSession(session) {
   currentUser = session?.user ?? null;
 
   if (!currentUser) {
+    stopOrdersPolling();
     showView("login");
     return;
   }
@@ -1369,6 +1456,7 @@ async function handleSession(session) {
   try {
     await loadAdminAccess();
     await loadRestaurant();
+    startOrdersPolling();
   } catch (error) {
     console.error(error);
     showView("restaurant");

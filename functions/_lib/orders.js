@@ -272,7 +272,7 @@ export async function listOwnerOrders(env, ownerId) {
 export async function getOrderNotificationDetails(env, orderId) {
   const orders = await supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,background_color,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
   );
   const order = orders[0];
   if (!order) throw new Error("Pedido não encontrado para notificação.");
@@ -281,6 +281,7 @@ export async function getOrderNotificationDetails(env, orderId) {
     ...order,
     restaurant_name: restaurant.name,
     logo_key: restaurant.logo_key,
+    background_color: restaurant.background_color,
     contact_email: restaurant.contact_email,
     whatsapp_number: restaurant.whatsapp_number,
     instagram_username: restaurant.instagram_username,

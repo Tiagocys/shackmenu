@@ -336,45 +336,50 @@ export async function createMercadoPagoPreference(env, {
   const pendingUrl = new URL(backUrl);
   pendingUrl.searchParams.set("order", "pending");
 
+  const body = {
+    external_reference: order.id,
+    statement_descriptor: "SHACK MENU",
+    notification_url: `${baseUrl}/api/orders/mercadopago/webhook`,
+    back_urls: {
+      success: successUrl.toString(),
+      failure: failureUrl.toString(),
+      pending: pendingUrl.toString(),
+    },
+    auto_return: "approved",
+    marketplace_fee: !testMode && order.platform_fee_cents > 0
+      ? centsToAmount(order.platform_fee_cents)
+      : undefined,
+    payment_methods: {
+      installments: 1,
+      default_installments: 1,
+    },
+    items: items.map((item) => ({
+      id: item.product_id,
+      title: item.name,
+      currency_id: "BRL",
+      quantity: item.quantity,
+      unit_price: centsToAmount(item.unit_amount_cents),
+    })),
+    metadata: {
+      order_id: order.id,
+      restaurant_id: restaurant.id,
+      owner_id: restaurant.owner_id,
+    },
+  };
+
+  if (!testMode) {
+    body.payer = buildPayer({
+      customerName,
+      customerEmail,
+      customerPhone,
+      customerDocument,
+    });
+  }
+
   const preference = await mercadoPagoRequest(env, "/checkout/preferences", {
     method: "POST",
     accessToken: testMode ? getMercadoPagoToken(env) : account.access_token,
-    body: {
-      external_reference: order.id,
-      statement_descriptor: "SHACK MENU",
-      notification_url: `${baseUrl}/api/orders/mercadopago/webhook`,
-      back_urls: {
-        success: successUrl.toString(),
-        failure: failureUrl.toString(),
-        pending: pendingUrl.toString(),
-      },
-      auto_return: "approved",
-      marketplace_fee: !testMode && order.platform_fee_cents > 0
-        ? centsToAmount(order.platform_fee_cents)
-        : undefined,
-      payer: buildPayer({
-        customerName,
-        customerEmail,
-        customerPhone,
-        customerDocument,
-      }),
-      payment_methods: {
-        installments: 1,
-        default_installments: 1,
-      },
-      items: items.map((item) => ({
-        id: item.product_id,
-        title: item.name,
-        currency_id: "BRL",
-        quantity: item.quantity,
-        unit_price: centsToAmount(item.unit_amount_cents),
-      })),
-      metadata: {
-        order_id: order.id,
-        restaurant_id: restaurant.id,
-        owner_id: restaurant.owner_id,
-      },
-    },
+    body,
   });
 
   await supabaseAdminRequest(

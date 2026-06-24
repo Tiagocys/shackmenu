@@ -33,6 +33,11 @@ function getRestaurantContact(order) {
   return lines;
 }
 
+function getRestaurantBackground(order) {
+  const color = String(order.background_color || "").trim();
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#f6f2ea";
+}
+
 function buildItemsHtml(order) {
   return getOrderLines(order).map((item) => `
     <tr>
@@ -51,8 +56,11 @@ function buildItemsText(order) {
 function buildCustomerEmail(env, order) {
   const logoUrl = getLogoUrl(env, order);
   const contact = getRestaurantContact(order);
+  const background = getRestaurantBackground(order);
   const subject = `Pedido #${order.order_number} recebido`;
   const text = [
+    "Não responda a este e-mail.",
+    "",
     `Pedido #${order.order_number} recebido por ${order.restaurant_name}.`,
     "",
     "Itens:",
@@ -66,9 +74,10 @@ function buildCustomerEmail(env, order) {
   ].filter(Boolean).join("\n");
 
   const html = `
-    <div style="font-family:Inter,Arial,sans-serif;background:#f6f2ea;padding:24px;color:#2d2922;">
+    <div style="font-family:Inter,Arial,sans-serif;background:${escapeHtml(background)};padding:24px;color:#2d2922;">
       <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:18px;padding:28px;">
         ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(order.restaurant_name)}" style="max-width:96px;max-height:96px;border-radius:18px;object-fit:cover;margin-bottom:18px;" />` : ""}
+        <p style="margin:0 0 14px;color:#9a3324;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Não responda a este e-mail</p>
         <p style="margin:0 0 8px;color:#7a6d5d;font-size:13px;text-transform:uppercase;letter-spacing:.08em;">Pedido recebido</p>
         <h1 style="margin:0 0 12px;font-size:26px;">Pedido #${escapeHtml(order.order_number)}</h1>
         <p style="margin:0 0 22px;font-size:16px;line-height:1.5;">Já recebemos seu pedido em <strong>${escapeHtml(order.restaurant_name)}</strong>. O restaurante vai trabalhar nele em breve.</p>
@@ -86,6 +95,7 @@ function buildCustomerEmail(env, order) {
 }
 
 function buildMerchantEmail(order) {
+  const background = getRestaurantBackground(order);
   const subject = `Novo pedido pago #${order.order_number}`;
   const customerLines = [
     `Cliente: ${order.customer_name}`,
@@ -107,7 +117,7 @@ function buildMerchantEmail(order) {
   ].filter(Boolean).join("\n");
 
   const html = `
-    <div style="font-family:Inter,Arial,sans-serif;background:#f6f2ea;padding:24px;color:#2d2922;">
+    <div style="font-family:Inter,Arial,sans-serif;background:${escapeHtml(background)};padding:24px;color:#2d2922;">
       <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:18px;padding:28px;">
         <p style="margin:0 0 8px;color:#7a6d5d;font-size:13px;text-transform:uppercase;letter-spacing:.08em;">Novo pedido pago</p>
         <h1 style="margin:0 0 12px;font-size:26px;">Pedido #${escapeHtml(order.order_number)}</h1>
@@ -122,16 +132,34 @@ function buildMerchantEmail(order) {
   return { subject, text, html };
 }
 
-async function sendEmail(env, { to, subject, text, html, replyTo }) {
+async function sendEmail(env, { to, subject, text, html, replyTo, fromName }) {
   if (!to) return null;
   const message = {
     to,
-    from: { email: SUPPORT_EMAIL, name: "Shack Menu" },
+    from: { email: SUPPORT_EMAIL, name: fromName || "Shack Menu" },
     replyTo: replyTo || SUPPORT_EMAIL,
     subject,
     text,
     html,
   };
+
+  const supabaseUrl = env.SUPABASE_URL || env.project_url;
+  const emailSecret = env.SHACKMENU_EMAIL_SECRET;
+  if (supabaseUrl && emailSecret) {
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-order-emails`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-shackmenu-email-secret": emailSecret,
+      },
+      body: JSON.stringify(message),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Supabase email function failed (${response.status}): ${body}`);
+    }
+    return response.json();
+  }
 
   if (env.EMAIL?.send) {
     return env.EMAIL.send(message);
@@ -140,7 +168,7 @@ async function sendEmail(env, { to, subject, text, html, replyTo }) {
   const accountId = env.CLOUDFLARE_ACCOUNT_ID || env.CF_ACCOUNT_ID;
   const token = env.CLOUDFLARE_EMAIL_API_TOKEN || env.CF_EMAIL_API_TOKEN;
   if (!accountId || !token) {
-    console.warn("Email binding not configured; skipping notification", { to, subject });
+    console.warn("Email provider not configured; skipping notification", { to, subject });
     return null;
   }
 
@@ -152,7 +180,7 @@ async function sendEmail(env, { to, subject, text, html, replyTo }) {
     },
     body: JSON.stringify({
       to,
-      from: { address: SUPPORT_EMAIL, name: "Shack Menu" },
+      from: { address: SUPPORT_EMAIL, name: fromName || "Shack Menu" },
       reply_to: replyTo || SUPPORT_EMAIL,
       subject,
       text,
@@ -172,6 +200,7 @@ export async function sendOrderPaymentConfirmedEmails(env, order) {
     tasks.push(sendEmail(env, {
       to: order.customer_email,
       replyTo: order.contact_email || SUPPORT_EMAIL,
+      fromName: order.restaurant_name || "Restaurante",
       ...buildCustomerEmail(env, order),
     }));
   }
