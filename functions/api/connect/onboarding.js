@@ -21,6 +21,6 @@ export async function onRequestPost({ request, env }) {
     return json({ url });
   } catch (error) {
     console.error("Could not create Mercado Pago onboarding", error);
-    return json({ error: "Não foi possível comunicar com o Mercado Pago." }, 500);
+    return json({ error: error.message || "Não foi possível comunicar com o Mercado Pago." }, 500);
   }
 }

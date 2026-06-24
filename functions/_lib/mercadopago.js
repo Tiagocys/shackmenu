@@ -37,7 +37,7 @@ function centsToAmount(cents) {
 }
 
 function getMercadoPagoRedirectUri(env, origin) {
-  const baseUrl = env.PUBLIC_APP_URL || origin;
+  const baseUrl = env.PUBLIC_APP_URL || "https://shackmenu.com";
   return `${baseUrl}/api/mercadopago/callback`;
 }
 

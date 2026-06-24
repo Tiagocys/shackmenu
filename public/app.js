@@ -1415,7 +1415,7 @@ connectOnboarding.addEventListener("click", async () => {
   ordersError.classList.add("hidden");
   ordersSuccess.classList.add("hidden");
   connectOnboarding.disabled = true;
-  connectOnboarding.innerHTML = '<span class="button-spinner"></span> Abrindo Stripe...';
+  connectOnboarding.innerHTML = '<span class="button-spinner"></span> Abrindo Mercado Pago...';
   try {
     const result = await authenticatedApi("/api/connect/onboarding", { method: "POST" });
     window.location.assign(result.url);
@@ -1424,7 +1424,7 @@ connectOnboarding.addEventListener("click", async () => {
     ordersError.textContent = error.message;
     ordersError.classList.remove("hidden");
     connectOnboarding.disabled = false;
-    connectOnboarding.textContent = "Configurar recebimentos";
+    connectOnboarding.textContent = "Conectar Mercado Pago";
   }
 });
 

@@ -317,7 +317,7 @@ app.post("/api/connect/onboarding", authenticate, async (request, response) => {
     return response.json({ url });
   } catch (error) {
     console.error("Could not create Mercado Pago onboarding", error);
-    return response.status(500).json({ error: "Não foi possível comunicar com o Mercado Pago." });
+    return response.status(500).json({ error: error.message || "Não foi possível comunicar com o Mercado Pago." });
   }
 });
 
