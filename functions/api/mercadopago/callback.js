@@ -1,4 +1,4 @@
-import { completeMercadoPagoOnboarding } from "../../_lib/mercadopago.js";
+import { completeMercadoPagoOnboarding, saveMercadoPagoOauthError } from "../../_lib/mercadopago.js";
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -16,6 +16,9 @@ export async function onRequestGet({ request, env }) {
     return Response.redirect(`${origin}/?connect=return`, 302);
   } catch (callbackError) {
     console.error("Mercado Pago OAuth callback failed", callbackError);
+    await saveMercadoPagoOauthError(env, { state, error: callbackError }).catch((logError) => {
+      console.error("Could not persist Mercado Pago OAuth error", logError);
+    });
     return Response.redirect(`${origin}/?connect=refresh`, 302);
   }
 }

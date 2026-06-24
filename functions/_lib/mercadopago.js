@@ -1,7 +1,12 @@
 import { supabaseAdminRequest } from "./supabase.js";
 
 function getMercadoPagoToken(env) {
-  const token = env.MP_TOKEN || env.MERCADO_PAGO_ACCESS_TOKEN || env.MERCADOPAGO_ACCESS_TOKEN;
+  const token = env.MP_TOKEN_PROD
+    || env.MERCADO_PAGO_ACCESS_TOKEN_PROD
+    || env.MERCADOPAGO_ACCESS_TOKEN_PROD
+    || env.MP_TOKEN
+    || env.MERCADO_PAGO_ACCESS_TOKEN
+    || env.MERCADOPAGO_ACCESS_TOKEN;
   if (!token) throw new Error("Mercado Pago não está configurado.");
   return token;
 }
@@ -12,8 +17,23 @@ function getMercadoPagoClientId(env) {
   return clientId;
 }
 
+function getMercadoPagoClientSecret(env) {
+  const clientSecret = env.MP_CLIENT_SECRET
+    || env.MERCADO_PAGO_CLIENT_SECRET
+    || env.MERCADOPAGO_CLIENT_SECRET;
+  if (!clientSecret) throw new Error("MP_CLIENT_SECRET não está configurado.");
+  return clientSecret;
+}
+
 export function hasMercadoPago(env) {
-  return Boolean(env.MP_TOKEN || env.MERCADO_PAGO_ACCESS_TOKEN || env.MERCADOPAGO_ACCESS_TOKEN);
+  return Boolean(
+    env.MP_TOKEN_PROD
+      || env.MERCADO_PAGO_ACCESS_TOKEN_PROD
+      || env.MERCADOPAGO_ACCESS_TOKEN_PROD
+      || env.MP_TOKEN
+      || env.MERCADO_PAGO_ACCESS_TOKEN
+      || env.MERCADOPAGO_ACCESS_TOKEN,
+  );
 }
 
 async function mercadoPagoRequest(env, path, { method = "GET", body, accessToken } = {}) {
@@ -36,7 +56,6 @@ async function mercadoPagoFormRequest(env, path, body) {
   const response = await fetch(`https://api.mercadopago.com${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getMercadoPagoToken(env)}`,
       "Content-Type": "application/x-www-form-urlencoded",
       Accept: "application/json",
     },
@@ -47,6 +66,34 @@ async function mercadoPagoFormRequest(env, path, body) {
     throw new Error(data.message || data.error || `Mercado Pago request failed (${response.status})`);
   }
   return data;
+}
+
+export async function saveMercadoPagoOauthError(env, { state, error }) {
+  let ownerId = null;
+  let restaurantId = null;
+  if (state) {
+    try {
+      const rows = await supabaseAdminRequest(
+        env,
+        `rest/v1/mercado_pago_oauth_states?select=owner_id,restaurant_id&state=eq.${encodeURIComponent(state)}&limit=1`,
+      );
+      ownerId = rows[0]?.owner_id || null;
+      restaurantId = rows[0]?.restaurant_id || null;
+    } catch (lookupError) {
+      console.error("Could not lookup Mercado Pago OAuth state for error logging", lookupError);
+    }
+  }
+  await supabaseAdminRequest(env, "rest/v1/mercado_pago_oauth_errors", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      state,
+      owner_id: ownerId,
+      restaurant_id: restaurantId,
+      error_message: error?.message || String(error || "Erro desconhecido"),
+      error_stack: error?.stack || null,
+    }),
+  });
 }
 
 function centsToAmount(cents) {
@@ -129,7 +176,7 @@ async function getValidMercadoPagoAccount(env, restaurantId) {
   if (!account.refresh_token) throw new Error("Conexão Mercado Pago expirada.");
   const credentials = await mercadoPagoFormRequest(env, "/oauth/token", {
     client_id: getMercadoPagoClientId(env),
-    client_secret: getMercadoPagoToken(env),
+    client_secret: getMercadoPagoClientSecret(env),
     grant_type: "refresh_token",
     refresh_token: account.refresh_token,
   });
@@ -174,7 +221,7 @@ export async function completeMercadoPagoOnboarding(env, { code, state, origin }
 
   const tokenBody = {
     client_id: getMercadoPagoClientId(env),
-    client_secret: getMercadoPagoToken(env),
+    client_secret: getMercadoPagoClientSecret(env),
     code,
     grant_type: "authorization_code",
     redirect_uri: getMercadoPagoRedirectUri(env, origin),

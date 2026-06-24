@@ -32,6 +32,7 @@ import {
   createMercadoPagoOnboardingUrl,
   getOwnerMercadoPagoAccount,
   publicMercadoPagoStatus,
+  saveMercadoPagoOauthError,
   syncMercadoPagoPayment,
 } from "../functions/_lib/mercadopago.js";
 import {
@@ -334,6 +335,12 @@ app.get("/api/mercadopago/callback", async (request, response) => {
     return response.redirect(302, `${origin}/?connect=return`);
   } catch (callbackError) {
     console.error("Mercado Pago OAuth callback failed", callbackError);
+    await saveMercadoPagoOauthError(process.env, {
+      state: state ? String(state) : null,
+      error: callbackError,
+    }).catch((logError) => {
+      console.error("Could not persist Mercado Pago OAuth error", logError);
+    });
     return response.redirect(302, `${origin}/?connect=refresh`);
   }
 });
