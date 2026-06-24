@@ -429,6 +429,12 @@ export async function syncMercadoPagoPayment(env, payment) {
   const orderId = payment.external_reference || payment.metadata?.order_id;
   if (!orderId) return null;
 
+  const existingRows = await supabaseAdminRequest(
+    env,
+    `rest/v1/orders?select=status&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+  );
+  const alreadyConfirmed = existingRows[0]?.status === "payment_confirmed";
+
   const status = payment.status === "approved"
     ? "payment_confirmed"
     : ["cancelled", "rejected"].includes(payment.status)
@@ -449,7 +455,9 @@ export async function syncMercadoPagoPayment(env, payment) {
       }),
     },
   );
-  return rows[0] || null;
+  const order = rows[0] || null;
+  if (order) order.was_already_confirmed = alreadyConfirmed;
+  return order;
 }
 
 export function mercadoPagoError(error) {

@@ -1,5 +1,7 @@
 import { json } from "../../../_lib/http.js";
 import { getMercadoPagoPaymentForOrder, syncMercadoPagoPayment } from "../../../_lib/mercadopago.js";
+import { getOrderNotificationDetails } from "../../../_lib/orders.js";
+import { sendOrderPaymentConfirmedEmails } from "../../../_lib/email.js";
 
 function getPaymentId(url, payload) {
   const params = new URL(url).searchParams;
@@ -30,7 +32,11 @@ export async function onRequestPost({ request, env }) {
     const paymentId = getPaymentId(request.url, payload);
     if (!paymentId) return json({ error: "Pagamento não informado." }, 400);
     const payment = await getMercadoPagoPaymentForOrder(env, paymentId);
-    await syncMercadoPagoPayment(env, payment);
+    const order = await syncMercadoPagoPayment(env, payment);
+    if (order?.status === "payment_confirmed" && !order.was_already_confirmed) {
+      const details = await getOrderNotificationDetails(env, order.id);
+      await sendOrderPaymentConfirmedEmails(env, details);
+    }
     return json({ received: true });
   } catch (error) {
     console.error("Mercado Pago webhook processing failed", error);

@@ -252,6 +252,9 @@ form .button-primary { margin-top: 12px; }
 .connect-card-active { border-color: #b9cf82; background: #eff9cf; }
 .connect-card-active p { color: #41610e; }
 .connect-card-pending { border-color: #e4c347; }
+.orders-notice { display: grid; gap: 6px; margin: 0 0 20px; padding: 18px 20px; border: 1px solid #a5c52c; border-radius: 14px; background: #eff9cf; color: #36500c; }
+.orders-notice strong { font: 800 18px/1.2 Manrope, sans-serif; letter-spacing: -.02em; }
+.orders-notice p { margin: 0; color: #41610e; line-height: 1.45; font-size: 13px; }
 .orders-section-heading { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .orders-section-heading span { color: var(--muted); font-size: 12px; }
 .orders-list { display: grid; gap: 14px; }

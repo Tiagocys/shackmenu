@@ -155,7 +155,12 @@ export async function createMercadoPagoOrderCheckoutSession(env, body, origin) {
     origin,
     returnUrl: body.returnUrl,
   });
-  return { url: preference.url, orderId: order.id, provider: "mercado_pago" };
+  return {
+    url: preference.url,
+    orderId: order.id,
+    orderNumber: order.order_number,
+    provider: "mercado_pago",
+  };
 }
 
 export async function createOrderCheckoutSession(env, body, origin) {
@@ -262,4 +267,22 @@ export async function listOwnerOrders(env, ownerId) {
     env,
     `rest/v1/orders?select=id,order_number,status,payment_provider,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,currency,paid_at,created_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=50`,
   );
+}
+
+export async function getOrderNotificationDetails(env, orderId) {
+  const orders = await supabaseAdminRequest(
+    env,
+    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+  );
+  const order = orders[0];
+  if (!order) throw new Error("Pedido não encontrado para notificação.");
+  const restaurant = order.restaurants || {};
+  return {
+    ...order,
+    restaurant_name: restaurant.name,
+    logo_key: restaurant.logo_key,
+    contact_email: restaurant.contact_email,
+    whatsapp_number: restaurant.whatsapp_number,
+    instagram_username: restaurant.instagram_username,
+  };
 }

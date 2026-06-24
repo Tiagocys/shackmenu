@@ -137,6 +137,7 @@ const connectCopy = document.querySelector("#connect-copy");
 const connectOnboarding = document.querySelector("#connect-onboarding");
 const ordersList = document.querySelector("#orders-list");
 const ordersCount = document.querySelector("#orders-count");
+const ordersNotice = document.querySelector("#orders-notice");
 
 let supabase;
 let applicationUrl = window.location.origin;
@@ -163,6 +164,8 @@ let adminAccess = false;
 let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 let activePublicMenu = null;
 let publicCart = [];
+
+const pendingPublicOrderKey = "shackmenu:pending-public-order";
 
 function showView(name) {
   Object.entries(views).forEach(([viewName, element]) => {
@@ -325,6 +328,22 @@ function renderOrderStatus(status) {
 function renderOrders(orders) {
   ordersList.replaceChildren();
   ordersCount.textContent = `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"}`;
+  ordersNotice.classList.add("hidden");
+  ordersNotice.replaceChildren();
+
+  const paidOrders = orders.filter((order) => order.status === "payment_confirmed");
+  if (paidOrders.length) {
+    const latest = paidOrders[0];
+    ordersNotice.classList.remove("hidden");
+    const title = document.createElement("strong");
+    title.textContent = `Pedido pago recebido #${latest.order_number}`;
+    const copy = document.createElement("p");
+    copy.textContent = paidOrders.length === 1
+      ? "Você tem 1 pedido pago no painel. Confira os itens abaixo para iniciar o preparo."
+      : `Você tem ${paidOrders.length} pedidos pagos no painel. Confira os itens abaixo para iniciar o preparo.`;
+    ordersNotice.append(title, copy);
+  }
+
   if (!orders.length) {
     const empty = document.createElement("p");
     empty.className = "category-empty";
@@ -995,6 +1014,18 @@ async function checkoutPublicCart() {
     });
     const result = await readApiResponse(response);
     if (!response.ok) throw new Error(result.error || "Não foi possível iniciar o pagamento.");
+    if (result.orderNumber) {
+      try {
+        localStorage.setItem(pendingPublicOrderKey, JSON.stringify({
+          restaurantId: activePublicMenu.restaurant.id,
+          orderId: result.orderId,
+          orderNumber: result.orderNumber,
+          createdAt: Date.now(),
+        }));
+      } catch (error) {
+        console.error("Could not save pending order confirmation", error);
+      }
+    }
     window.location.assign(result.url);
   } catch (error) {
     console.error(error);
@@ -1117,11 +1148,25 @@ function renderPublicMenu(menu) {
 
   const orderStatus = new URLSearchParams(window.location.search).get("order");
   if (orderStatus === "success") {
+    let orderNumber = null;
+    try {
+      const pendingOrder = JSON.parse(localStorage.getItem(pendingPublicOrderKey) || "null");
+      const isSameRestaurant = pendingOrder?.restaurantId === menu.restaurant.id;
+      const isRecent = pendingOrder?.createdAt && Date.now() - pendingOrder.createdAt < 24 * 60 * 60 * 1000;
+      if (isSameRestaurant && isRecent) orderNumber = pendingOrder.orderNumber;
+      localStorage.removeItem(pendingPublicOrderKey);
+    } catch (error) {
+      console.error("Could not read pending order confirmation", error);
+    }
     publicCart = [];
     savePublicCart();
     window.history.replaceState({}, "", window.location.pathname);
-    window.setTimeout(() => alert("Pagamento recebido. O restaurante verá o pedido no painel assim que a Stripe confirmar."), 200);
+    const message = orderNumber
+      ? `Pedido #${orderNumber} confirmado. Anote esse número para acompanhar com o restaurante. Também enviamos os detalhes por e-mail.`
+      : "Pedido confirmado. Anote essa confirmação para acompanhar com o restaurante. Também enviamos os detalhes por e-mail.";
+    window.setTimeout(() => alert(message), 200);
   } else if (orderStatus === "cancelled") {
+    localStorage.removeItem(pendingPublicOrderKey);
     window.history.replaceState({}, "", window.location.pathname);
     window.setTimeout(() => alert("Pagamento não concluído. Seu pedido continua no carrinho."), 200);
   }
