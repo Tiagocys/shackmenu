@@ -21,10 +21,16 @@ import {
   getOwnerRestaurant,
 } from "../functions/_lib/connect.js";
 import {
+  getOwnerDeliveryCities,
+  replaceOwnerDeliveryCities,
+  validateCepForRestaurant,
+} from "../functions/_lib/delivery.js";
+import {
   createMercadoPagoOrderCheckoutSession,
   listOwnerOrders,
   markOrderPaymentConfirmed,
   markOrderPaymentFailed,
+  refundMercadoPagoOrder,
 } from "../functions/_lib/orders.js";
 import {
   getMercadoPagoPaymentForOrder,
@@ -250,7 +256,12 @@ app.post("/api/billing/portal", authenticate, async (request, response) => {
     if (process.env.STRIPE_PORTAL_CONFIGURATION_ID) {
       parameters.configuration = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
     }
-    const session = await stripeRequest(process.env, "/billing_portal/sessions", parameters);
+    const session = await stripeRequest(
+      process.env,
+      "/billing_portal/sessions",
+      parameters,
+      { priceId: subscription.stripe_price_id },
+    );
     return response.json({ url: session.url });
   } catch (error) {
     console.error("Could not create Stripe portal", error);
@@ -363,10 +374,16 @@ app.post("/api/orders/checkout", async (request, response) => {
       "Nenhum produto válido encontrado.",
       "Informe o nome para o pedido.",
       "Informe um e-mail válido.",
+      "Informe um CEP com 8 dígitos.",
+      "CEP não encontrado.",
+      "Não foi possível consultar o CEP.",
+      "Informe o número ou complemento da entrega.",
+      "Este restaurante ainda não configurou as cidades de entrega.",
       "Mercado Pago não está configurado.",
     ];
-    return response.status(expected.includes(error.message) ? 400 : 500).json({
-      error: expected.includes(error.message)
+    const expectedError = expected.includes(error.message) || error.message?.startsWith("Este restaurante não entrega em ");
+    return response.status(expectedError ? 400 : 500).json({
+      error: expectedError
         ? error.message
         : "Não foi possível comunicar com o Mercado Pago.",
     });
@@ -395,6 +412,69 @@ app.get("/api/orders", authenticate, async (request, response) => {
   } catch (error) {
     console.error("Could not list orders", error);
     return response.status(500).json({ error: "Não foi possível carregar os pedidos." });
+  }
+});
+
+app.post("/api/orders/refund", authenticate, async (request, response) => {
+  try {
+    const order = await refundMercadoPagoOrder(process.env, request.user.id, request.body?.orderId);
+    return response.json({ order });
+  } catch (error) {
+    const expectedError = error.status === 404
+      || error.status === 400
+      || /Pedido|pedido|Apenas|Mercado Pago/.test(error.message || "");
+    if (!expectedError) console.error("Could not refund Mercado Pago order", error);
+    return response.status(error.status || (expectedError ? 400 : 500)).json({
+      error: expectedError
+        ? error.message
+        : "Não foi possível reembolsar este pedido no Mercado Pago.",
+    });
+  }
+});
+
+app.get("/api/delivery-cities", authenticate, async (request, response) => {
+  try {
+    return response.json({ cities: await getOwnerDeliveryCities(process.env, request.user.id) });
+  } catch (error) {
+    console.error("Could not read delivery cities", error);
+    return response.status(500).json({ error: "Não foi possível carregar as cidades de entrega." });
+  }
+});
+
+app.put("/api/delivery-cities", authenticate, async (request, response) => {
+  try {
+    const restaurant = await getOwnerRestaurant(process.env, request.user.id);
+    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
+    const cities = await replaceOwnerDeliveryCities(
+      process.env,
+      request.user.id,
+      restaurant.id,
+      request.body?.cities,
+    );
+    return response.json({ cities });
+  } catch (error) {
+    console.error("Could not save delivery cities", error);
+    return response.status(500).json({ error: "Não foi possível salvar as cidades de entrega." });
+  }
+});
+
+app.post("/api/delivery-check", async (request, response) => {
+  try {
+    const restaurantId = String(request.body?.restaurantId || "").trim();
+    if (!restaurantId) return response.status(400).json({ error: "Restaurante não informado." });
+    const address = await validateCepForRestaurant(process.env, restaurantId, request.body?.cep);
+    return response.json({ address });
+  } catch (error) {
+    const expected = [
+      "Informe um CEP com 8 dígitos.",
+      "CEP não encontrado.",
+      "Não foi possível consultar o CEP.",
+      "Este restaurante ainda não configurou as cidades de entrega.",
+    ];
+    const expectedError = expected.includes(error.message) || error.message?.startsWith("Este restaurante não entrega em ");
+    if (expectedError) return response.status(400).json({ error: error.message });
+    console.error("Could not validate delivery CEP", error);
+    return response.status(500).json({ error: "Não foi possível validar a entrega." });
   }
 });
 

@@ -53,11 +53,21 @@ function buildItemsText(order) {
     .join("\n");
 }
 
+function formatDeliveryAddress(order) {
+  return [
+    order.delivery_address,
+    order.delivery_neighborhood,
+    order.delivery_city && order.delivery_state ? `${order.delivery_city}/${order.delivery_state}` : null,
+    order.delivery_cep ? `CEP ${order.delivery_cep}` : null,
+    order.delivery_complement ? `Complemento: ${order.delivery_complement}` : null,
+  ].filter(Boolean).join(" - ");
+}
+
 function buildCustomerEmail(env, order) {
   const logoUrl = getLogoUrl(env, order);
   const contact = getRestaurantContact(order);
   const background = getRestaurantBackground(order);
-  const subject = `Pedido #${order.order_number} recebido`;
+  const subject = `Seu pedido em ${order.restaurant_name} foi recebido`;
   const text = [
     "Não responda a este e-mail.",
     "",
@@ -79,7 +89,8 @@ function buildCustomerEmail(env, order) {
         ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(order.restaurant_name)}" style="max-width:96px;max-height:96px;border-radius:18px;object-fit:cover;margin-bottom:18px;" />` : ""}
         <p style="margin:0 0 14px;color:#9a3324;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;">Não responda a este e-mail</p>
         <p style="margin:0 0 8px;color:#7a6d5d;font-size:13px;text-transform:uppercase;letter-spacing:.08em;">Pedido recebido</p>
-        <h1 style="margin:0 0 12px;font-size:26px;">Pedido #${escapeHtml(order.order_number)}</h1>
+        <h1 style="margin:0 0 12px;font-size:26px;">Seu pedido em ${escapeHtml(order.restaurant_name)} foi recebido</h1>
+        <p style="margin:0 0 12px;color:#7a6d5d;font-size:14px;">Número do pedido: <strong>#${escapeHtml(order.order_number)}</strong></p>
         <p style="margin:0 0 22px;font-size:16px;line-height:1.5;">Já recebemos seu pedido em <strong>${escapeHtml(order.restaurant_name)}</strong>. O restaurante vai trabalhar nele em breve.</p>
         <table style="width:100%;border-collapse:collapse;margin:8px 0 18px;">${buildItemsHtml(order)}</table>
         <p style="font-size:18px;margin:0 0 20px;text-align:right;"><strong>Subtotal: ${formatPrice(order.subtotal_cents)}</strong></p>
@@ -101,6 +112,7 @@ function buildMerchantEmail(order) {
     `Cliente: ${order.customer_name}`,
     `E-mail: ${order.customer_email}`,
     order.customer_phone ? `Telefone: ${order.customer_phone}` : "",
+    formatDeliveryAddress(order) ? `Entrega: ${formatDeliveryAddress(order)}` : "",
   ].filter(Boolean);
   const text = [
     `Novo pedido pago no ${order.restaurant_name}.`,
@@ -121,7 +133,7 @@ function buildMerchantEmail(order) {
       <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:18px;padding:28px;">
         <p style="margin:0 0 8px;color:#7a6d5d;font-size:13px;text-transform:uppercase;letter-spacing:.08em;">Novo pedido pago</p>
         <h1 style="margin:0 0 12px;font-size:26px;">Pedido #${escapeHtml(order.order_number)}</h1>
-        <p style="margin:0 0 18px;line-height:1.5;"><strong>Cliente:</strong> ${escapeHtml(order.customer_name)}<br><strong>E-mail:</strong> ${escapeHtml(order.customer_email)}${order.customer_phone ? `<br><strong>Telefone:</strong> ${escapeHtml(order.customer_phone)}` : ""}</p>
+        <p style="margin:0 0 18px;line-height:1.5;"><strong>Cliente:</strong> ${escapeHtml(order.customer_name)}<br><strong>E-mail:</strong> ${escapeHtml(order.customer_email)}${order.customer_phone ? `<br><strong>Telefone:</strong> ${escapeHtml(order.customer_phone)}` : ""}${formatDeliveryAddress(order) ? `<br><strong>Entrega:</strong> ${escapeHtml(formatDeliveryAddress(order))}` : ""}</p>
         <table style="width:100%;border-collapse:collapse;margin:8px 0 18px;">${buildItemsHtml(order)}</table>
         <p style="font-size:18px;margin:0 0 8px;text-align:right;"><strong>Subtotal: ${formatPrice(order.subtotal_cents)}</strong></p>
         <p style="margin:0 0 20px;text-align:right;color:#7a6d5d;">${order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "Sem taxa Shack Menu"}</p>
@@ -200,7 +212,7 @@ export async function sendOrderPaymentConfirmedEmails(env, order) {
     tasks.push(sendEmail(env, {
       to: order.customer_email,
       replyTo: order.contact_email || SUPPORT_EMAIL,
-      fromName: order.restaurant_name || "Restaurante",
+      fromName: "Shack Menu",
       ...buildCustomerEmail(env, order),
     }));
   }

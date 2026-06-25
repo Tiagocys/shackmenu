@@ -1,6 +1,7 @@
-import { createMercadoPagoPreference } from "./mercadopago.js";
+import { createMercadoPagoFullRefund, createMercadoPagoPreference } from "./mercadopago.js";
 import { stripeRequest } from "./stripe.js";
 import { supabaseAdminRequest } from "./supabase.js";
+import { validateRestaurantDeliveryAddress } from "./delivery.js";
 
 function sanitizeLine(value, max = 500) {
   return String(value || "").trim().slice(0, max);
@@ -20,9 +21,9 @@ function normalizeCpf(value) {
 
 function getApplicationFeePercent(isPro, env) {
   if (isPro) return 0;
-  const configured = Number(env.ORDER_PLATFORM_FEE_PERCENT || 15);
-  if (!Number.isFinite(configured)) return 15;
-  return Math.min(20, Math.max(15, Math.round(configured)));
+  const configured = Number(env.ORDER_PLATFORM_FEE_PERCENT || 12);
+  if (!Number.isFinite(configured)) return 12;
+  return Math.min(20, Math.max(0, Math.round(configured)));
 }
 
 function getOrderReturnUrl(returnUrl, fallbackOrigin, slug, status) {
@@ -95,6 +96,10 @@ async function createOrderRecord(env, body) {
   const customerEmail = sanitizeLine(body.customerEmail, 120).toLowerCase();
   if (customerName.length < 2) throw new Error("Informe o nome para o pedido.");
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail)) throw new Error("Informe um e-mail válido.");
+  const deliveryAddress = await validateRestaurantDeliveryAddress(env, restaurant.id, {
+    cep: body.deliveryCep,
+    complement: body.deliveryComplement,
+  });
 
   const isPro = await isOwnerPro(env, restaurant.owner_id);
   const feePercent = getApplicationFeePercent(isPro, env);
@@ -109,6 +114,12 @@ async function createOrderRecord(env, body) {
       customer_name: customerName,
       customer_email: customerEmail,
       customer_phone: normalizePhone(body.customerPhone),
+      delivery_cep: deliveryAddress.cep,
+      delivery_city: deliveryAddress.city,
+      delivery_state: deliveryAddress.state,
+      delivery_address: deliveryAddress.address,
+      delivery_neighborhood: deliveryAddress.neighborhood,
+      delivery_complement: deliveryAddress.complement,
       notes: sanitizeLine(body.notes, 500) || null,
       items,
       subtotal_cents: subtotal,
@@ -265,14 +276,66 @@ export async function markOrderPaymentFailed(env, session) {
 export async function listOwnerOrders(env, ownerId) {
   return supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=id,order_number,status,payment_provider,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,currency,paid_at,created_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=50`,
+    `rest/v1/orders?select=id,order_number,status,payment_provider,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,currency,paid_at,created_at,mercado_pago_payment_id,mercado_pago_refund_id,mercado_pago_refund_status,refunded_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=50`,
   );
+}
+
+export async function refundMercadoPagoOrder(env, ownerId, orderId) {
+  const id = sanitizeLine(orderId, 80);
+  if (!id) throw new Error("Pedido não informado.");
+
+  const rows = await supabaseAdminRequest(
+    env,
+    `rest/v1/orders?select=id,owner_id,restaurant_id,order_number,status,payment_provider,mercado_pago_payment_id,mercado_pago_refund_id&owner_id=eq.${encodeURIComponent(ownerId)}&id=eq.${encodeURIComponent(id)}&limit=1`,
+  );
+  const order = rows[0];
+  if (!order) {
+    const error = new Error("Pedido não encontrado.");
+    error.status = 404;
+    throw error;
+  }
+  if (order.status !== "payment_confirmed") {
+    throw new Error("Apenas pedidos pagos podem ser reembolsados.");
+  }
+  if (order.payment_provider !== "mercado_pago" || !order.mercado_pago_payment_id) {
+    throw new Error("Este pedido não possui pagamento Mercado Pago para reembolso.");
+  }
+  if (order.mercado_pago_refund_id) {
+    throw new Error("Este pedido já foi reembolsado.");
+  }
+
+  let refund;
+  try {
+    refund = await createMercadoPagoFullRefund(env, order);
+  } catch (error) {
+    const message = error.status === 404
+      ? "Pagamento Mercado Pago não encontrado com as credenciais atuais. Esse pedido pode ter sido criado com chaves antigas ou outra conta Mercado Pago."
+      : error.message || "Não foi possível reembolsar este pedido no Mercado Pago.";
+    const refundError = new Error(message);
+    refundError.status = error.status || 400;
+    throw refundError;
+  }
+  const updateRows = await supabaseAdminRequest(
+    env,
+    `rest/v1/orders?id=eq.${encodeURIComponent(order.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "refunded",
+        mercado_pago_refund_id: refund.id ? String(refund.id) : null,
+        mercado_pago_refund_status: refund.status || "approved",
+        refunded_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return updateRows[0] || null;
 }
 
 export async function getOrderNotificationDetails(env, orderId) {
   const orders = await supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,background_color,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,background_color,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
   );
   const order = orders[0];
   if (!order) throw new Error("Pedido não encontrado para notificação.");

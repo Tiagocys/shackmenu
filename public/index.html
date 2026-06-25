@@ -58,7 +58,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285f4" d="M21.6 12.2c0-.7-.1-1.5-.2-2.2H12v4.3h5.4a4.6 4.6 0 0 1-2 3v2.8h3.5c2-1.9 3.2-4.6 3.2-7.9Z"/><path fill="#34a853" d="M12 22c2.9 0 5.3-1 7-2.6l-3.5-2.8c-1 .7-2.2 1-3.5 1a6.2 6.2 0 0 1-5.8-4.3H2.6v2.8A10.6 10.6 0 0 0 12 22Z"/><path fill="#fbbc05" d="M6.2 13.3a6.4 6.4 0 0 1 0-4V6.5H2.6a10.6 10.6 0 0 0 0 9.6l3.6-2.8Z"/><path fill="#ea4335" d="M12 4.9c1.6 0 3 .5 4.1 1.6l3.1-3A10.4 10.4 0 0 0 2.6 6.4l3.6 2.8A6.2 6.2 0 0 1 12 5Z"/></svg>
           Continuar com Google
         </button>
-        <small>Ao continuar, você concorda com os Termos de Uso e a Política de Privacidade.</small>
+        <small>Ao continuar, você concorda com os <a href="#terms" data-open-terms>Termos de Uso</a> e a Política de Privacidade.</small>
       </div>
     </section>
 
@@ -363,6 +363,7 @@
               <li>Botão de WhatsApp</li>
               <li>Link público do Shack Menu</li>
               <li>Hospedagem de imagens otimizada</li>
+              <li>Checkout online com taxa Shack Menu de 12% por pedido pago</li>
             </ul>
             <button class="button button-plan-current" type="button" disabled>Plano atual</button>
           </article>
@@ -378,6 +379,7 @@
               <li>Sem a marca “Feito com Shack Menu”</li>
               <li>Domínio próprio com SSL</li>
               <li>Pedidos pelo cardápio</li>
+              <li>Checkout online sem taxa Shack Menu por pedido pago</li>
               <li>Cupons e produtos em destaque <small>em breve</small></li>
               <li>QR Code e importação por planilha <small>em breve</small></li>
             </ul>
@@ -385,6 +387,57 @@
             <small class="pricing-note">Cobrança mensal segura pela Stripe. Cancele quando quiser.</small>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section id="terms-view" class="legal-view hidden">
+      <div class="legal-shell">
+        <button id="terms-back" class="button button-ghost" type="button">← Voltar</button>
+        <span class="eyebrow">Transparência</span>
+        <h1>Termos de uso e taxas</h1>
+        <p class="legal-lead">Este resumo explica como o Shack Menu cobra pelo uso da plataforma e como as taxas de pagamento online são aplicadas aos pedidos.</p>
+
+        <article class="legal-card">
+          <h2>Planos</h2>
+          <p><strong>Plano gratuito:</strong> permite criar e publicar um cardápio digital com os recursos básicos do Shack Menu. Quando o restaurante usa checkout online pelo Mercado Pago, o Shack Menu cobra uma taxa de plataforma de <strong>12% sobre pedidos pagos</strong>.</p>
+          <p><strong>Plano Pro:</strong> remove a taxa Shack Menu por pedido pago e libera recursos adicionais, como maior limite de produtos, domínio próprio e remoção da marca Shack Menu no cardápio público.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Taxa Shack Menu</h2>
+          <p>A taxa Shack Menu é cobrada apenas quando um pedido é pago com sucesso pelo checkout online. Pedidos enviados pelo WhatsApp, pedidos pendentes, pagamentos recusados ou pedidos não concluídos não geram taxa Shack Menu.</p>
+          <p>No plano gratuito, a taxa atual é de <strong>12%</strong>. Exemplo: em um pedido de R$ 100,00, a taxa Shack Menu é de R$ 12,00. O valor restante fica para o restaurante, descontadas também as taxas do Mercado Pago.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Taxas do Mercado Pago</h2>
+          <p>O Mercado Pago cobra tarifas próprias de processamento, independentes do Shack Menu. Essas tarifas variam conforme o meio de pagamento, prazo de recebimento, parcelamento e regras da conta do lojista.</p>
+          <p>Como referência pública do Mercado Pago Brasil, vendas online podem ter tarifas como Pix a 0,99%, cartão de crédito com recebimento na hora a 4,98%, cartão em 14 dias a 4,49%, cartão em 30 dias a 3,99% e boleto com tarifa fixa. As tarifas oficiais podem mudar e devem ser conferidas na conta Mercado Pago do restaurante.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Exemplos</h2>
+          <p><strong>Pedido Pix de R$ 100,00 no plano gratuito:</strong> taxa Shack Menu de R$ 12,00, além da taxa de processamento do Mercado Pago. O restaurante recebe o valor líquido restante na sua conta Mercado Pago.</p>
+          <p><strong>Pedido Pix de R$ 100,00 no plano Pro:</strong> taxa Shack Menu de R$ 0,00. O restaurante paga apenas as tarifas do Mercado Pago aplicáveis ao pagamento.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Reembolsos e cancelamentos</h2>
+          <p>Quando um pedido pago é cancelado e reembolsado integralmente pela plataforma, o cliente deve receber o valor integral do pedido. Nesse caso, a taxa Shack Menu daquele pedido também é revertida quando o Mercado Pago processa o reembolso.</p>
+          <p>O Shack Menu só mantém taxa de plataforma sobre pedidos concluídos e não reembolsados.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Recebimento dos valores</h2>
+          <p>Os pagamentos online são processados pelo Mercado Pago. O valor do restaurante é destinado à conta Mercado Pago conectada pelo lojista, enquanto a taxa Shack Menu, quando aplicável, é separada como taxa de marketplace.</p>
+          <p>A disponibilidade do saldo, prazos de saque, análise antifraude, chargebacks, parcelamentos e eventuais bloqueios são definidos pelo Mercado Pago.</p>
+        </article>
+
+        <article class="legal-card">
+          <h2>Alterações</h2>
+          <p>O Shack Menu pode atualizar preços, limites e taxas dos planos. Quando houver mudanças relevantes, a plataforma deverá exibir aviso aos usuários antes da aplicação prática da alteração.</p>
+          <p>Dúvidas sobre cobrança podem ser enviadas para <strong>support@shackmenu.com</strong>.</p>
+        </article>
       </div>
     </section>
 
@@ -422,6 +475,25 @@
         </div>
         <p id="orders-error" class="form-error hidden" role="alert"></p>
         <p id="orders-success" class="form-success hidden" role="status"></p>
+        <article class="delivery-card">
+          <div>
+            <span class="pricing-label">Área de entrega</span>
+            <h2>Cidades atendidas</h2>
+            <p>Selecione os estados e cidades onde o restaurante entrega. As alterações são salvas automaticamente.</p>
+          </div>
+          <form id="delivery-city-form" class="delivery-city-form">
+            <select id="delivery-city-state">
+              <option value="">Estado</option>
+            </select>
+            <select id="delivery-city-name" disabled>
+              <option value="">Cidade</option>
+            </select>
+            <button class="button button-primary" type="submit">Adicionar</button>
+          </form>
+          <div id="delivery-cities-list" class="delivery-cities-list"></div>
+          <p id="delivery-cities-empty" class="category-empty">Nenhuma cidade cadastrada ainda.</p>
+          <button id="delivery-cities-save" class="button button-ghost" type="button">Salvar novamente</button>
+        </article>
         <article id="connect-card" class="connect-card">
           <div>
             <span class="pricing-label">Recebimentos</span>
@@ -431,8 +503,13 @@
           <button id="connect-onboarding" class="button button-primary" type="button">Conectar Mercado Pago</button>
         </article>
         <article id="orders-notice" class="orders-notice hidden" role="status"></article>
+        <div id="orders-tabs" class="orders-tabs" role="tablist" aria-label="Filtrar pedidos">
+          <button class="orders-tab orders-tab-active" type="button" data-order-tab="paid">Pagos <span>0</span></button>
+          <button class="orders-tab" type="button" data-order-tab="pending">Pendentes <span>0</span></button>
+          <button class="orders-tab" type="button" data-order-tab="cancelled">Cancelados <span>0</span></button>
+        </div>
         <div class="orders-section-heading">
-          <strong>Últimos pedidos</strong>
+          <strong id="orders-section-title">Pedidos pagos</strong>
           <span id="orders-count">0 pedidos</span>
         </div>
         <div id="orders-list" class="orders-list"></div>
@@ -440,6 +517,42 @@
     </section>
 
     <section id="public-menu-view" class="public-menu-view hidden">
+      <div id="public-address-gate" class="public-address-gate hidden" role="dialog" aria-modal="true" aria-labelledby="address-gate-title">
+        <form id="public-address-form" class="public-address-card">
+          <span class="eyebrow">Entrega</span>
+          <h2 id="address-gate-title">Para onde vamos entregar?</h2>
+          <p id="public-address-copy">Informe seu CEP para verificar se o restaurante atende sua região.</p>
+          <p id="public-address-error" class="form-error hidden" role="alert"></p>
+          <div id="public-address-step-cep" class="address-step">
+            <label for="public-address-cep">CEP</label>
+            <input id="public-address-cep" type="text" inputmode="numeric" maxlength="9" placeholder="00000-000" />
+            <button id="public-address-lookup" class="button button-primary" type="button">Verificar CEP</button>
+          </div>
+          <div id="public-address-step-details" class="address-step hidden">
+            <label for="public-address-street">Endereço</label>
+            <input id="public-address-street" type="text" readonly />
+            <label for="public-address-neighborhood">Bairro</label>
+            <input id="public-address-neighborhood" type="text" readonly />
+            <div class="address-row">
+              <div>
+                <label for="public-address-city">Cidade</label>
+                <input id="public-address-city" type="text" readonly />
+              </div>
+              <div>
+                <label for="public-address-state">UF</label>
+                <input id="public-address-state" type="text" readonly />
+              </div>
+            </div>
+            <label for="public-address-complement">Número ou complemento</label>
+            <input id="public-address-complement" type="text" maxlength="120" placeholder="Ex: 123, bloco B apto 45" />
+            <div class="address-actions">
+              <button id="public-address-change-cep" class="button button-ghost" type="button">Trocar CEP</button>
+              <button class="button button-primary" type="submit">Usar este endereço</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <button id="public-address-summary" class="public-address-summary hidden" type="button"></button>
       <header class="menu-hero">
         <img id="public-restaurant-logo" class="public-restaurant-logo hidden" alt="" />
         <span class="eyebrow">Cardápio digital</span>
@@ -508,6 +621,7 @@
     <span>Precisa de ajuda?</span>
     <strong id="support-email">support@shackmenu.com</strong>
     <button id="copy-support-email" type="button">Copiar e-mail</button>
+    <button data-open-terms type="button">Termos de uso</button>
   </footer>
 
   <script type="module" src="/app.js"></script>

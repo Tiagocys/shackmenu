@@ -15,9 +15,16 @@ export async function onRequestPost({ request, env }) {
       "Nenhum produto válido encontrado.",
       "Informe o nome para o pedido.",
       "Informe um e-mail válido.",
+      "Informe um CEP com 8 dígitos.",
+      "CEP não encontrado.",
+      "Não foi possível consultar o CEP.",
+      "Informe o número ou complemento da entrega.",
+      "Este restaurante ainda não configurou as cidades de entrega.",
       "Mercado Pago não está configurado.",
     ];
-    if (expected.includes(error.message)) return json({ error: error.message }, 400);
+    if (expected.includes(error.message) || error.message?.startsWith("Este restaurante não entrega em ")) {
+      return json({ error: error.message }, 400);
+    }
     const result = mercadoPagoError(error);
     return json({ error: result.message }, result.status);
   }

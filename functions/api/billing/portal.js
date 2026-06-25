@@ -18,7 +18,12 @@ export async function onRequestPost({ request, env }) {
     if (env.STRIPE_PORTAL_CONFIGURATION_ID) {
       parameters.configuration = env.STRIPE_PORTAL_CONFIGURATION_ID;
     }
-    const session = await stripeRequest(env, "/billing_portal/sessions", parameters);
+    const session = await stripeRequest(
+      env,
+      "/billing_portal/sessions",
+      parameters,
+      { priceId: subscription.stripe_price_id },
+    );
     return json({ url: session.url });
   } catch (error) {
     return stripeError(error);

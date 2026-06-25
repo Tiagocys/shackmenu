@@ -2,8 +2,18 @@ import { json } from "./http.js";
 
 export const stripeApiVersion = "2026-05-27.dahlia";
 
-export async function stripeRequest(env, path, parameters) {
-  const secret = env.STRIPE_SECRET;
+export function getStripeSecret(env, { priceId, testMode = false } = {}) {
+  if (testMode || (priceId && priceId === env.STRIPE_PRO_PRICE_ID_TEST)) {
+    return env.STRIPE_SECRET_TEST || env.STRIPE_SECRET;
+  }
+  if (priceId && priceId === env.STRIPE_PRO_PRICE_ID) {
+    return env.STRIPE_SECRET_LIVE || env.STRIPE_SECRET;
+  }
+  return env.STRIPE_SECRET || env.STRIPE_SECRET_LIVE || env.STRIPE_SECRET_TEST;
+}
+
+export async function stripeRequest(env, path, parameters, options = {}) {
+  const secret = getStripeSecret(env, options);
   if (!secret) throw new Error("STRIPE_SECRET is not configured");
 
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
@@ -41,7 +51,7 @@ export async function getUserSubscription(request, env, ownerId) {
   const supabaseUrl = env.SUPABASE_URL || env.project_url;
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   const response = await fetch(
-    `${supabaseUrl}/rest/v1/subscriptions?select=stripe_customer_id,stripe_subscription_id,status,cancel_at_period_end&owner_id=eq.${ownerId}`,
+    `${supabaseUrl}/rest/v1/subscriptions?select=stripe_customer_id,stripe_subscription_id,stripe_price_id,status,cancel_at_period_end&owner_id=eq.${ownerId}`,
     {
       headers: {
         apikey: env.SUPABASE_ANON_KEY,

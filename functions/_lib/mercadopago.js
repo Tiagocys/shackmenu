@@ -48,18 +48,33 @@ export function hasMercadoPago(env) {
   );
 }
 
-async function mercadoPagoRequest(env, path, { method = "GET", body, accessToken } = {}) {
+async function mercadoPagoRequest(env, path, {
+  method = "GET",
+  body,
+  accessToken,
+  headers = {},
+} = {}) {
   const response = await fetch(`https://api.mercadopago.com${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken || getMercadoPagoToken(env)}`,
       "Content-Type": "application/json",
+      ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await response.json();
+  const text = await response.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
   if (!response.ok) {
-    throw new Error(data.message || data.error || `Mercado Pago request failed (${response.status})`);
+    const error = new Error(data.message || data.error || `Mercado Pago request failed (${response.status})`);
+    error.status = response.status;
+    error.details = data;
+    throw error;
   }
   return data;
 }
@@ -405,6 +420,43 @@ export async function createMercadoPagoPreference(env, {
 
 export async function getMercadoPagoPayment(env, paymentId) {
   return mercadoPagoRequest(env, `/v1/payments/${encodeURIComponent(paymentId)}`);
+}
+
+export async function createMercadoPagoFullRefund(env, order) {
+  if (!order?.mercado_pago_payment_id) throw new Error("Pagamento Mercado Pago não encontrado.");
+  const testMode = isMercadoPagoTestMode(env);
+  const account = testMode ? null : await getValidMercadoPagoAccount(env, order.restaurant_id);
+  const refundPath = `/v1/payments/${encodeURIComponent(order.mercado_pago_payment_id)}/refunds`;
+  const requestOptions = (accessToken) => ({
+    method: "POST",
+    accessToken,
+    headers: {
+      "X-Idempotency-Key": `shackmenu-order-refund-${order.id}`,
+    },
+  });
+  const accessTokens = [
+    testMode ? getMercadoPagoToken(env) : account?.access_token,
+    getMercadoPagoToken(env),
+  ].filter(Boolean);
+
+  const accounts = await supabaseAdminRequest(
+    env,
+    "rest/v1/restaurant_mercado_pago_accounts?select=access_token&status=eq.active&order=last_synced_at.desc&limit=100",
+  );
+  accounts.forEach((row) => {
+    if (row.access_token) accessTokens.push(row.access_token);
+  });
+
+  let lastError;
+  for (const accessToken of [...new Set(accessTokens)]) {
+    try {
+      return await mercadoPagoRequest(env, refundPath, requestOptions(accessToken));
+    } catch (error) {
+      lastError = error;
+      if (![401, 403, 404].includes(Number(error.status))) throw error;
+    }
+  }
+  throw lastError || new Error("Não foi possível localizar o pagamento Mercado Pago.");
 }
 
 export async function getMercadoPagoPaymentForOrder(env, paymentId) {

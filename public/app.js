@@ -11,6 +11,7 @@ const views = {
   upgrade: document.querySelector("#upgrade-view"),
   admin: document.querySelector("#admin-view"),
   orders: document.querySelector("#orders-view"),
+  terms: document.querySelector("#terms-view"),
   publicMenu: document.querySelector("#public-menu-view"),
 };
 
@@ -19,6 +20,8 @@ const siteHeader = document.querySelector(".site-header");
 const supportFooter = document.querySelector("#platform-support-footer");
 const supportEmail = document.querySelector("#support-email");
 const copySupportEmail = document.querySelector("#copy-support-email");
+const termsLinks = document.querySelectorAll("[data-open-terms]");
+const termsBack = document.querySelector("#terms-back");
 const adminButton = document.querySelector("#admin-menu");
 const ordersButton = document.querySelector("#orders-menu");
 const ordersBadge = document.querySelector("#orders-badge");
@@ -87,6 +90,21 @@ const publicCustomerDocument = document.querySelector("#public-customer-document
 const publicOrderNotes = document.querySelector("#public-order-notes");
 const publicCartCheckout = document.querySelector("#public-cart-checkout");
 const publicCartSend = document.querySelector("#public-cart-send");
+const publicAddressGate = document.querySelector("#public-address-gate");
+const publicAddressForm = document.querySelector("#public-address-form");
+const publicAddressCopy = document.querySelector("#public-address-copy");
+const publicAddressError = document.querySelector("#public-address-error");
+const publicAddressStepCep = document.querySelector("#public-address-step-cep");
+const publicAddressStepDetails = document.querySelector("#public-address-step-details");
+const publicAddressCep = document.querySelector("#public-address-cep");
+const publicAddressLookup = document.querySelector("#public-address-lookup");
+const publicAddressStreet = document.querySelector("#public-address-street");
+const publicAddressNeighborhood = document.querySelector("#public-address-neighborhood");
+const publicAddressCity = document.querySelector("#public-address-city");
+const publicAddressState = document.querySelector("#public-address-state");
+const publicAddressComplement = document.querySelector("#public-address-complement");
+const publicAddressChangeCep = document.querySelector("#public-address-change-cep");
+const publicAddressSummary = document.querySelector("#public-address-summary");
 const settingsBack = document.querySelector("#settings-back");
 const settingsForm = document.querySelector("#settings-form");
 const settingsRestaurantName = document.querySelector("#settings-restaurant-name");
@@ -132,6 +150,12 @@ const ordersBack = document.querySelector("#orders-back");
 const ordersRefresh = document.querySelector("#orders-refresh");
 const ordersError = document.querySelector("#orders-error");
 const ordersSuccess = document.querySelector("#orders-success");
+const deliveryCityForm = document.querySelector("#delivery-city-form");
+const deliveryCityName = document.querySelector("#delivery-city-name");
+const deliveryCityState = document.querySelector("#delivery-city-state");
+const deliveryCitiesList = document.querySelector("#delivery-cities-list");
+const deliveryCitiesEmpty = document.querySelector("#delivery-cities-empty");
+const deliveryCitiesSave = document.querySelector("#delivery-cities-save");
 const connectCard = document.querySelector("#connect-card");
 const connectTitle = document.querySelector("#connect-title");
 const connectCopy = document.querySelector("#connect-copy");
@@ -139,6 +163,8 @@ const connectOnboarding = document.querySelector("#connect-onboarding");
 const ordersList = document.querySelector("#orders-list");
 const ordersCount = document.querySelector("#orders-count");
 const ordersNotice = document.querySelector("#orders-notice");
+const ordersTabs = document.querySelector("#orders-tabs");
+const ordersSectionTitle = document.querySelector("#orders-section-title");
 
 let supabase;
 let applicationUrl = window.location.origin;
@@ -165,6 +191,13 @@ let adminAccess = false;
 let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 let activePublicMenu = null;
 let publicCart = [];
+let deliveryCities = [];
+let ibgeStates = [];
+let ibgeCitiesByState = new Map();
+let publicDeliveryAddress = null;
+let pendingPublicAddress = null;
+let allOrders = [];
+let activeOrdersTab = "paid";
 let lastPaidOrderId = null;
 let ordersPollTimer = null;
 let notificationAudioContext = null;
@@ -175,7 +208,7 @@ function showView(name) {
   Object.entries(views).forEach(([viewName, element]) => {
     element.classList.toggle("hidden", viewName !== name);
   });
-  const publicView = ["loading", "login", "publicMenu"].includes(name);
+  const publicView = ["loading", "login", "terms", "publicMenu"].includes(name);
   signOutButton.classList.toggle("hidden", publicView);
   supportFooter.classList.toggle("hidden", name === "loading" || name === "publicMenu");
   adminButton.classList.toggle("hidden", publicView || name === "admin" || !adminAccess);
@@ -188,6 +221,35 @@ function showView(name) {
 
 function getPaidOrders(orders) {
   return orders.filter((order) => order.status === "payment_confirmed");
+}
+
+function getOrdersForTab(orders, tab) {
+  if (tab === "paid") return orders.filter((order) => order.status === "payment_confirmed");
+  if (tab === "pending") return orders.filter((order) => order.status === "awaiting_payment");
+  if (tab === "cancelled") return orders.filter((order) => ["cancelled", "payment_failed", "refunded"].includes(order.status));
+  return orders;
+}
+
+function getOrdersTabLabel(tab) {
+  return {
+    paid: "Pedidos pagos",
+    pending: "Pedidos pendentes",
+    cancelled: "Pedidos cancelados",
+  }[tab] || "Pedidos";
+}
+
+function updateOrdersTabs(orders) {
+  const counts = {
+    paid: getOrdersForTab(orders, "paid").length,
+    pending: getOrdersForTab(orders, "pending").length,
+    cancelled: getOrdersForTab(orders, "cancelled").length,
+  };
+  ordersTabs.querySelectorAll("[data-order-tab]").forEach((button) => {
+    const tab = button.dataset.orderTab;
+    button.classList.toggle("orders-tab-active", tab === activeOrdersTab);
+    button.setAttribute("aria-selected", tab === activeOrdersTab ? "true" : "false");
+    button.querySelector("span").textContent = String(counts[tab] || 0);
+  });
 }
 
 function updateOrdersBadge(orders = []) {
@@ -358,13 +420,206 @@ function renderConnectStatus(payment = {}) {
   connectOnboarding.classList.remove("hidden");
   const status = payment.status || "not_started";
   const active = status === "active" && payment.chargesEnabled;
+  const isPro = planUsage.plan === "pro";
+  const checkoutFee = isPro ? "0%" : "12%";
   connectCard.classList.toggle("connect-card-active", active);
   connectCard.classList.toggle("connect-card-pending", !active);
   connectTitle.textContent = active ? "Pagamento online ativo" : payment.label || "Onboarding pendente";
   connectCopy.textContent = active
-    ? "Seu cardápio pode receber pedidos pagos online com Pix, cartão e outros meios disponíveis na sua conta Mercado Pago."
-    : "Conecte a conta Mercado Pago do restaurante para liberar checkout online. Sem isso, os pedidos continuam apenas pelo WhatsApp.";
+    ? `Seu cardápio recebe Pix, cartão e outros meios via Mercado Pago. Taxa Shack Menu no checkout: ${checkoutFee}. ${isPro ? "Plano Pro ativo: sem taxa Shack Menu." : "Assine o Pro para remover essa taxa."}`
+    : `Conecte a conta Mercado Pago para liberar pagamento online. No plano gratuito, a taxa Shack Menu é de ${checkoutFee} por pagamento confirmado. O plano Pro remove essa taxa.`;
   connectOnboarding.textContent = active ? "Reconectar Mercado Pago" : "Conectar Mercado Pago";
+}
+
+function renderDeliveryCities() {
+  deliveryCitiesList.replaceChildren();
+  deliveryCitiesEmpty.classList.toggle("hidden", deliveryCities.length > 0);
+  deliveryCities.forEach((entry, index) => {
+    const item = document.createElement("span");
+    item.className = "delivery-city-chip";
+    const label = document.createElement("strong");
+    label.textContent = `${entry.city}/${entry.state}`;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Remover ${entry.city}/${entry.state}`);
+    remove.addEventListener("click", () => {
+      deliveryCities.splice(index, 1);
+      renderDeliveryCities();
+      saveDeliveryCities();
+    });
+    item.append(label, remove);
+    deliveryCitiesList.append(item);
+  });
+}
+
+async function loadDeliveryCities() {
+  const result = await authenticatedApi("/api/delivery-cities");
+  deliveryCities = result.cities || [];
+  renderDeliveryCities();
+}
+
+async function loadBrazilianStates() {
+  if (ibgeStates.length) return;
+  const response = await fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome");
+  if (!response.ok) throw new Error("Não foi possível carregar os estados.");
+  ibgeStates = await response.json();
+  deliveryCityState.replaceChildren(new Option("Estado", ""));
+  ibgeStates.forEach((state) => {
+    const option = new Option(state.nome, state.sigla);
+    option.dataset.id = state.id;
+    deliveryCityState.append(option);
+  });
+}
+
+async function loadBrazilianCitiesForState(state) {
+  const uf = normalizeDeliveryState(state);
+  if (!uf) {
+    deliveryCityName.replaceChildren(new Option("Cidade", ""));
+    deliveryCityName.disabled = true;
+    return;
+  }
+  if (!ibgeCitiesByState.has(uf)) {
+    const response = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`);
+    if (!response.ok) throw new Error("Não foi possível carregar as cidades.");
+    ibgeCitiesByState.set(uf, await response.json());
+  }
+  deliveryCityName.replaceChildren(new Option("Cidade", ""));
+  ibgeCitiesByState.get(uf).forEach((city) => {
+    deliveryCityName.append(new Option(city.nome, city.nome));
+  });
+  deliveryCityName.disabled = false;
+}
+
+async function saveDeliveryCities() {
+  deliveryCitiesSave.disabled = true;
+  deliveryCitiesSave.textContent = "Salvando...";
+  ordersError.classList.add("hidden");
+  ordersSuccess.classList.add("hidden");
+  try {
+    const result = await authenticatedApi("/api/delivery-cities", {
+      method: "PUT",
+      body: JSON.stringify({ cities: deliveryCities }),
+    });
+    deliveryCities = result.cities || [];
+    renderDeliveryCities();
+    ordersSuccess.textContent = "Cidades de entrega salvas.";
+    ordersSuccess.classList.remove("hidden");
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+  } finally {
+    deliveryCitiesSave.disabled = false;
+    deliveryCitiesSave.textContent = "Salvar novamente";
+  }
+}
+
+function getPublicAddressStorageKey() {
+  return activePublicMenu ? `shackmenu:delivery-address:${activePublicMenu.restaurant.id}` : null;
+}
+
+function savePublicDeliveryAddress() {
+  const key = getPublicAddressStorageKey();
+  if (!key || !publicDeliveryAddress) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(publicDeliveryAddress));
+  } catch (error) {
+    console.error("Could not save delivery address", error);
+  }
+}
+
+function loadPublicDeliveryAddress() {
+  publicDeliveryAddress = null;
+  const key = getPublicAddressStorageKey();
+  if (!key) return;
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || "null");
+    if (stored?.cep && stored?.city && stored?.state && stored?.complement) {
+      publicDeliveryAddress = stored;
+    }
+  } catch (error) {
+    console.error("Could not load delivery address", error);
+  }
+}
+
+function formatPublicAddress(address) {
+  return [
+    address.address,
+    address.neighborhood,
+    `${address.city}/${address.state}`,
+    `CEP ${address.cep}`,
+    `Complemento: ${address.complement}`,
+  ].filter(Boolean).join(" - ");
+}
+
+function renderPublicAddressState() {
+  const canOrder = Boolean(activePublicMenu?.restaurant.whatsapp_number || activePublicMenu?.restaurant.payment_online_active || mercadoPagoTestMode);
+  if (!canOrder) {
+    publicAddressGate.classList.add("hidden");
+    publicAddressSummary.classList.add("hidden");
+    document.body.classList.remove("address-gate-open");
+    publicMenuContent.classList.remove("menu-blurred");
+    publicCategoryNav.classList.remove("menu-blurred");
+    return;
+  }
+  const hasAddress = Boolean(publicDeliveryAddress);
+  publicAddressGate.classList.toggle("hidden", hasAddress);
+  publicAddressSummary.classList.toggle("hidden", !hasAddress);
+  document.body.classList.toggle("address-gate-open", !hasAddress && activeViewName === "publicMenu");
+  publicMenuContent.classList.toggle("menu-blurred", !hasAddress);
+  publicCategoryNav.classList.toggle("menu-blurred", !hasAddress);
+  publicCartButton.disabled = !hasAddress;
+  publicAddressError.classList.add("hidden");
+  if (hasAddress) {
+    publicAddressSummary.textContent = `Entrega em: ${formatPublicAddress(publicDeliveryAddress)} • Alterar`;
+  } else {
+    publicAddressStepCep.classList.remove("hidden");
+    publicAddressStepDetails.classList.add("hidden");
+    publicAddressCep.focus();
+  }
+}
+
+async function lookupPublicAddress() {
+  const cep = normalizeCep(publicAddressCep.value);
+  if (cep.length !== 8) {
+    publicAddressError.textContent = "Informe um CEP com 8 dígitos.";
+    publicAddressError.classList.remove("hidden");
+    publicAddressCep.focus();
+    return;
+  }
+
+  publicAddressLookup.disabled = true;
+  publicAddressLookup.innerHTML = '<span class="button-spinner"></span> Verificando...';
+  publicAddressError.classList.add("hidden");
+  try {
+    const response = await fetch("/api/delivery-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        restaurantId: activePublicMenu.restaurant.id,
+        cep,
+      }),
+    });
+    const result = await readApiResponse(response);
+    if (!response.ok) throw new Error(result.error || "Não foi possível validar o CEP.");
+    pendingPublicAddress = result.address;
+    publicAddressStreet.value = result.address.address || "";
+    publicAddressNeighborhood.value = result.address.neighborhood || "";
+    publicAddressCity.value = result.address.city || "";
+    publicAddressState.value = result.address.state || "";
+    publicAddressComplement.value = "";
+    publicAddressStepCep.classList.add("hidden");
+    publicAddressStepDetails.classList.remove("hidden");
+    publicAddressCopy.textContent = "Confira o endereço e informe número ou complemento.";
+    publicAddressComplement.focus();
+  } catch (error) {
+    publicAddressError.textContent = error.message;
+    publicAddressError.classList.remove("hidden");
+  } finally {
+    publicAddressLookup.disabled = false;
+    publicAddressLookup.textContent = "Verificar CEP";
+  }
 }
 
 function renderOrderStatus(status) {
@@ -373,14 +628,54 @@ function renderOrderStatus(status) {
     payment_confirmed: "Pago",
     payment_failed: "Pagamento falhou",
     cancelled: "Cancelado",
+    refunded: "Reembolsado",
   };
   return labels[status] || status;
 }
 
+function canRefundOrder(order) {
+  return order.status === "payment_confirmed"
+    && order.payment_provider === "mercado_pago"
+    && order.mercado_pago_payment_id
+    && !order.mercado_pago_refund_id;
+}
+
+async function refundOrder(order, button) {
+  const confirmed = window.confirm(
+    `Reembolsar integralmente o pedido #${order.order_number}? Esta ação será enviada ao Mercado Pago.`,
+  );
+  if (!confirmed) return;
+
+  ordersError.classList.add("hidden");
+  ordersSuccess.classList.add("hidden");
+  button.disabled = true;
+  const originalText = button.textContent;
+  button.textContent = "Reembolsando...";
+  try {
+    await authenticatedApi("/api/orders/refund", {
+      method: "POST",
+      body: JSON.stringify({ orderId: order.id }),
+    });
+    ordersSuccess.textContent = `Pedido #${order.order_number} reembolsado integralmente.`;
+    ordersSuccess.classList.remove("hidden");
+    await loadOrders();
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
 function renderOrders(orders) {
+  allOrders = orders;
+  const visibleOrders = getOrdersForTab(orders, activeOrdersTab);
   ordersList.replaceChildren();
-  ordersCount.textContent = `${orders.length} ${orders.length === 1 ? "pedido" : "pedidos"}`;
+  ordersSectionTitle.textContent = getOrdersTabLabel(activeOrdersTab);
+  ordersCount.textContent = `${visibleOrders.length} ${visibleOrders.length === 1 ? "pedido" : "pedidos"}`;
   updateOrdersBadge(orders);
+  updateOrdersTabs(orders);
   ordersNotice.classList.add("hidden");
   ordersNotice.replaceChildren();
 
@@ -397,15 +692,15 @@ function renderOrders(orders) {
     ordersNotice.append(title, copy);
   }
 
-  if (!orders.length) {
+  if (!visibleOrders.length) {
     const empty = document.createElement("p");
     empty.className = "category-empty";
-    empty.textContent = "Nenhum pedido online recebido ainda.";
+    empty.textContent = `Nenhum pedido em "${getOrdersTabLabel(activeOrdersTab).toLowerCase()}" no momento.`;
     ordersList.append(empty);
     return;
   }
 
-  orders.forEach((order) => {
+  visibleOrders.forEach((order) => {
     const item = document.createElement("article");
     item.className = "order-card";
 
@@ -420,6 +715,16 @@ function renderOrders(orders) {
 
     const customer = document.createElement("p");
     customer.textContent = `${order.customer_name} • ${order.customer_email || "sem e-mail"}`;
+    const delivery = document.createElement("p");
+    delivery.textContent = order.delivery_city
+      ? `Entrega: ${[
+        order.delivery_address,
+        order.delivery_neighborhood,
+        `${order.delivery_city}/${order.delivery_state}`,
+        order.delivery_cep ? `CEP ${order.delivery_cep}` : null,
+        order.delivery_complement ? `Complemento: ${order.delivery_complement}` : null,
+      ].filter(Boolean).join(" - ")}`
+      : "Entrega não informada";
 
     const products = document.createElement("ul");
     products.className = "order-items";
@@ -439,13 +744,27 @@ function renderOrders(orders) {
       : "Sem taxa Shack Menu";
     totals.append(subtotal, fee);
 
+    const actions = document.createElement("div");
+    actions.className = "order-actions";
+    if (canRefundOrder(order)) {
+      const refundButton = document.createElement("button");
+      refundButton.type = "button";
+      refundButton.className = "button-secondary button-danger";
+      refundButton.textContent = "Reembolsar integralmente";
+      refundButton.addEventListener("click", () => refundOrder(order, refundButton));
+      actions.append(refundButton);
+    }
+
     if (order.notes) {
       const notes = document.createElement("p");
       notes.className = "order-notes";
       notes.textContent = `Observações: ${order.notes}`;
-      item.append(header, customer, products, totals, notes);
+      item.append(header, customer, delivery, products, totals);
+      if (actions.childElementCount) item.append(actions);
+      item.append(notes);
     } else {
-      item.append(header, customer, products, totals);
+      item.append(header, customer, delivery, products, totals);
+      if (actions.childElementCount) item.append(actions);
     }
     ordersList.append(item);
   });
@@ -456,9 +775,12 @@ async function loadOrders() {
   ordersRefresh.disabled = true;
   ordersRefresh.textContent = "Atualizando...";
   try {
+    await loadPlanUsage();
+    await loadBrazilianStates();
     const [connectResult, ordersResult] = await Promise.all([
       authenticatedApi("/api/connect/status"),
       authenticatedApi("/api/orders"),
+      loadDeliveryCities(),
     ]);
     renderConnectStatus(connectResult.payment);
     renderOrders(ordersResult.orders || []);
@@ -652,6 +974,24 @@ function normalizeInstagram(value) {
     .replace(/\/$/, "")
     .split(/[?#]/)[0];
   return /^[a-z0-9._]{1,30}$/.test(username) ? username : undefined;
+}
+
+function normalizeDeliveryCity(value) {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9\s-]/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function normalizeDeliveryState(value) {
+  return value.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+}
+
+function normalizeCep(value) {
+  return value.replace(/\D/g, "").slice(0, 8);
 }
 
 function getContrastColor(hexColor) {
@@ -1060,6 +1400,8 @@ function getPublicCustomerPayload() {
     customerEmail: publicCustomerEmail.value.trim(),
     customerPhone: publicCustomerPhone.value.trim(),
     customerDocument: publicCustomerDocument.value.trim(),
+    deliveryCep: publicDeliveryAddress?.cep || "",
+    deliveryComplement: publicDeliveryAddress?.complement || "",
     notes: publicOrderNotes.value.trim(),
   };
 }
@@ -1082,6 +1424,16 @@ async function checkoutPublicCart() {
   if (customer.customerDocument && customer.customerDocument.replace(/\D/g, "").length !== 11) {
     publicCustomerDocument.focus();
     alert("Informe um CPF com 11 dígitos ou deixe o campo em branco.");
+    return;
+  }
+  if (!publicDeliveryAddress) {
+    closePublicCart();
+    renderPublicAddressState();
+    alert("Informe o endereço de entrega antes de finalizar o pedido.");
+    return;
+  }
+  if (activePublicMenu.restaurant.delivery_cities?.length === 0) {
+    alert("Este restaurante ainda não configurou as cidades de entrega.");
     return;
   }
 
@@ -1169,6 +1521,7 @@ function createPublicProductCard(product) {
 
 function renderPublicMenu(menu) {
   activePublicMenu = menu;
+  loadPublicDeliveryAddress();
   loadPublicCart();
   const visibleCategories = menu.categories.filter((category) => category.products.length > 0);
   siteHeader.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
@@ -1256,6 +1609,7 @@ function renderPublicMenu(menu) {
     window.history.replaceState({}, "", window.location.pathname);
     window.setTimeout(() => alert("Pagamento não concluído. Seu pedido continua no carrinho."), 200);
   }
+  renderPublicAddressState();
   renderPublicCart();
 }
 
@@ -1464,6 +1818,11 @@ async function handleSession(session) {
   }
 }
 
+function openTerms() {
+  showView("terms");
+  window.history.replaceState({}, "", "#terms");
+}
+
 async function init() {
   try {
     const response = await fetch("/api/config");
@@ -1480,6 +1839,11 @@ async function init() {
     const customMenuDomain = getCustomMenuDomain();
     if (publicSlug || customMenuDomain) {
       await loadPublicMenu({ slug: publicSlug, domain: customMenuDomain });
+      return;
+    }
+
+    if (window.location.hash === "#terms") {
+      showView("terms");
       return;
     }
 
@@ -1552,6 +1916,74 @@ adminRefresh.addEventListener("click", loadAdminCustomers);
 ordersBack.addEventListener("click", () => showView(ordersReturnView));
 ordersRefresh.addEventListener("click", loadOrders);
 upgradeBack.addEventListener("click", () => showView(upgradeReturnView));
+ordersTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-order-tab]");
+  if (!button) return;
+  activeOrdersTab = button.dataset.orderTab;
+  renderOrders(allOrders);
+});
+deliveryCitiesSave.addEventListener("click", saveDeliveryCities);
+deliveryCityState.addEventListener("change", async () => {
+  ordersError.classList.add("hidden");
+  deliveryCityName.disabled = true;
+  deliveryCityName.replaceChildren(new Option("Carregando cidades...", ""));
+  try {
+    await loadBrazilianCitiesForState(deliveryCityState.value);
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+    deliveryCityName.replaceChildren(new Option("Cidade", ""));
+  }
+});
+deliveryCityForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const city = deliveryCityName.value.trim();
+  const state = normalizeDeliveryState(deliveryCityState.value);
+  const normalizedCity = normalizeDeliveryCity(city);
+  if (city.length < 2 || state.length !== 2 || !normalizedCity) {
+    ordersError.textContent = "Selecione um estado e uma cidade válidos.";
+    ordersError.classList.remove("hidden");
+    return;
+  }
+  const exists = deliveryCities.some((entry) => (
+    normalizeDeliveryCity(entry.city) === normalizedCity && entry.state === state
+  ));
+  if (!exists) deliveryCities.push({ city, state, normalized_city: normalizedCity });
+  deliveryCityName.value = "";
+  deliveryCityName.focus();
+  ordersError.classList.add("hidden");
+  renderDeliveryCities();
+  saveDeliveryCities();
+});
+publicAddressLookup.addEventListener("click", lookupPublicAddress);
+publicAddressChangeCep.addEventListener("click", () => {
+  pendingPublicAddress = null;
+  publicAddressCopy.textContent = "Informe seu CEP para verificar se o restaurante atende sua região.";
+  publicAddressStepDetails.classList.add("hidden");
+  publicAddressStepCep.classList.remove("hidden");
+  publicAddressCep.focus();
+});
+publicAddressSummary.addEventListener("click", () => {
+  publicDeliveryAddress = null;
+  renderPublicAddressState();
+});
+publicAddressForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const complement = publicAddressComplement.value.trim().replace(/\s+/g, " ");
+  if (!pendingPublicAddress || !complement) {
+    publicAddressError.textContent = "Informe o número ou complemento da entrega.";
+    publicAddressError.classList.remove("hidden");
+    publicAddressComplement.focus();
+    return;
+  }
+  publicDeliveryAddress = {
+    ...pendingPublicAddress,
+    complement,
+  };
+  savePublicDeliveryAddress();
+  renderPublicAddressState();
+});
 
 connectOnboarding.addEventListener("click", async () => {
   ordersError.classList.add("hidden");
@@ -2147,6 +2579,16 @@ copySupportEmail.addEventListener("click", async () => {
   } catch {
     window.prompt("Copie o e-mail de suporte:", email);
   }
+});
+termsLinks.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    openTerms();
+  });
+});
+termsBack.addEventListener("click", () => {
+  window.history.replaceState({}, "", window.location.pathname);
+  showView(currentUser ? "items" : "login");
 });
 
 init();

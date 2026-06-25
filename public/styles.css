@@ -72,6 +72,7 @@ main { min-height: calc(100vh - 76px); }
 .button-primary:hover:not(:disabled) { background: #32302a; }
 .button-ghost { background: transparent; color: var(--muted); }
 .button-upgrade { padding: 10px 16px; background: var(--lime); color: var(--ink); }
+.auth-card small a { color: var(--ink); font-weight: 800; text-decoration: underline; text-underline-offset: 2px; }
 .platform-support-footer { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 20px 24px; border-top: 1px solid var(--line); background: #eeece5; color: var(--muted); font-size: 11px; }
 .platform-support-footer strong { color: var(--ink); }
 .platform-support-footer button { padding: 4px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
@@ -247,8 +248,26 @@ form .button-primary { margin-top: 12px; }
 .admin-customer-info, .admin-customer-data { display: grid; gap: 5px; }
 .admin-customer-info small, .admin-customer-data span { color: var(--muted); font-size: 11px; }
 .admin-customer-data strong { font-size: 13px; }
+.legal-view { min-height: calc(100vh - 76px); padding: clamp(32px, 6vw, 72px) 24px; background: #f6f3ea; }
+.legal-shell { width: min(880px, 100%); display: grid; gap: 16px; margin: 0 auto; }
+.legal-shell > .button { width: fit-content; }
+.legal-shell h1 { margin: 8px 0 0; font: 800 clamp(38px, 6vw, 62px)/1 Manrope, sans-serif; letter-spacing: -.05em; }
+.legal-lead { max-width: 720px; margin: 0 0 14px; color: var(--muted); line-height: 1.6; }
+.legal-card { display: grid; gap: 10px; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+.legal-card h2 { margin: 0; font: 800 22px/1.2 Manrope, sans-serif; letter-spacing: -.03em; }
+.legal-card p { margin: 0; color: var(--muted); line-height: 1.65; }
+.legal-card strong { color: var(--ink); }
 .button-danger { background: #a93220; color: white; }
 .button-danger:hover { background: #872719; }
+.delivery-card { display: grid; gap: 16px; margin-bottom: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+.delivery-card h2 { margin: 8px 0 7px; font: 800 25px/1.15 Manrope, sans-serif; letter-spacing: -.035em; }
+.delivery-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.delivery-city-form { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 10px; align-items: end; }
+.delivery-city-form input, .delivery-city-form select { width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
+.delivery-city-form .button, .delivery-card > .button { width: auto; }
+.delivery-cities-list { display: flex; flex-wrap: wrap; gap: 9px; }
+.delivery-city-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; background: #f2efe7; color: var(--ink); font-size: 13px; }
+.delivery-city-chip button { width: 20px; height: 20px; display: grid; place-items: center; border: 0; border-radius: 999px; background: #dedbd2; color: var(--ink); font-weight: 800; }
 .connect-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: center; margin-bottom: 26px; padding: 24px; border: 1px solid #e4c347; border-radius: 18px; background: #fff8d9; }
 .connect-card h2 { margin: 8px 0 7px; font: 800 25px/1.15 Manrope, sans-serif; letter-spacing: -.035em; }
 .connect-card p { margin: 0; color: #77630e; line-height: 1.5; }
@@ -259,6 +278,11 @@ form .button-primary { margin-top: 12px; }
 .orders-notice { display: grid; gap: 6px; margin: 0 0 20px; padding: 18px 20px; border: 1px solid #a5c52c; border-radius: 14px; background: #eff9cf; color: #36500c; }
 .orders-notice strong { font: 800 18px/1.2 Manrope, sans-serif; letter-spacing: -.02em; }
 .orders-notice p { margin: 0; color: #41610e; line-height: 1.45; font-size: 13px; }
+.orders-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 12px; }
+.orders-tab { display: inline-flex; align-items: center; gap: 8px; padding: 10px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--muted); font-size: 13px; font-weight: 800; }
+.orders-tab span { min-width: 22px; height: 22px; display: inline-grid; place-items: center; border-radius: 999px; background: #f2efe7; color: var(--muted); font-size: 11px; }
+.orders-tab-active { border-color: var(--ink); background: var(--ink); color: white; }
+.orders-tab-active span { background: var(--lime); color: var(--ink); }
 .orders-section-heading { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .orders-section-heading span { color: var(--muted); font-size: 12px; }
 .orders-list { display: grid; gap: 14px; }
@@ -267,12 +291,25 @@ form .button-primary { margin-top: 12px; }
 .order-card p { margin: 0; color: var(--muted); font-size: 13px; }
 .order-items { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
 .order-totals { padding-top: 11px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.order-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .order-status { padding: 5px 8px; border-radius: 999px; background: #e7e4db; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
 .order-status-payment_confirmed { background: #eff9cf; color: #41610e; }
-.order-status-payment_failed, .order-status-cancelled { background: #fff0ec; color: #a93220; }
+.order-status-payment_failed, .order-status-cancelled, .order-status-refunded { background: #fff0ec; color: #a93220; }
 .order-notes { padding: 11px; border-radius: 9px; background: #f7f5ef; }
 
 .public-menu-view { min-height: calc(100vh - 76px); background: var(--menu-background, #f4f1e9); }
+.public-address-gate { position: fixed; inset: 0; z-index: 28; display: grid; place-items: center; padding: 24px; background: rgba(27, 26, 23, .34); backdrop-filter: blur(6px); }
+.public-address-card { width: min(460px, 100%); display: grid; gap: 14px; padding: 28px; border-radius: 22px; background: var(--paper); box-shadow: 0 24px 80px rgba(27, 26, 23, .24); }
+.public-address-card h2 { margin: 0; font: 800 30px/1.1 Manrope, sans-serif; letter-spacing: -.04em; }
+.public-address-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.address-step { display: grid; gap: 11px; }
+.address-step label { font-size: 12px; font-weight: 800; }
+.address-row { display: grid; grid-template-columns: minmax(0, 1fr) 82px; gap: 10px; }
+.address-row > div { display: grid; gap: 8px; }
+.address-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; margin-top: 4px; }
+.public-address-summary { position: sticky; top: 0; z-index: 7; width: 100%; padding: 12px 20px; border: 0; background: var(--ink); color: white; font-size: 12px; font-weight: 800; text-align: center; }
+.menu-blurred { filter: blur(5px); pointer-events: none; user-select: none; }
+body.address-gate-open { overflow: hidden; }
 .menu-hero { padding: 64px max(24px, calc((100% - 1040px) / 2)); background: var(--ink); color: white; }
 .public-restaurant-logo { width: 88px; height: 88px; display: block; margin-bottom: 26px; border-radius: 22px; object-fit: cover; background: white; }
 .menu-hero h1 { max-width: 760px; margin: 12px 0 10px; font: 800 clamp(42px, 7vw, 72px)/1 Manrope, sans-serif; letter-spacing: -.05em; }
@@ -375,6 +412,8 @@ body.cart-open { overflow: hidden; }
   .admin-heading, .orders-heading { display: grid; }
   .admin-heading-actions { flex-wrap: wrap; }
   .admin-customer { grid-template-columns: 1fr; gap: 14px; }
+  .delivery-city-form { grid-template-columns: 1fr; }
+  .delivery-city-form .button, .delivery-card > .button { width: 100%; }
   .connect-card { grid-template-columns: 1fr; }
   .connect-card .button { width: 100%; min-width: 0; }
   .order-card-header, .order-totals { align-items: flex-start; flex-direction: column; }
@@ -387,6 +426,7 @@ body.cart-open { overflow: hidden; }
   .public-whatsapp { right: 16px; bottom: 16px; }
   .public-cart-button { left: 16px; bottom: 16px; }
   .public-cart { padding: 24px 20px; }
+  .address-actions { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
