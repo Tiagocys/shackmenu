@@ -127,6 +127,17 @@ function centsToAmount(cents) {
   return Number((cents / 100).toFixed(2));
 }
 
+function getStatementDescriptor(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+  return (normalized || "RESTAURANTE").slice(0, 13);
+}
+
 function base64UrlEncode(bytes) {
   let binary = "";
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
@@ -353,7 +364,7 @@ export async function createMercadoPagoPreference(env, {
 
   const body = {
     external_reference: order.id,
-    statement_descriptor: "SHACK MENU",
+    statement_descriptor: getStatementDescriptor(restaurant.name),
     notification_url: `${baseUrl}/api/orders/mercadopago/webhook`,
     back_urls: {
       success: successUrl.toString(),
@@ -488,11 +499,17 @@ export async function syncMercadoPagoPayment(env, payment) {
 
   const existingRows = await supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=status&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    `rest/v1/orders?select=id,status,mercado_pago_refund_id,mercado_pago_refund_status,refunded_at&id=eq.${encodeURIComponent(orderId)}&limit=1`,
   );
-  const alreadyConfirmed = existingRows[0]?.status === "payment_confirmed";
+  const existingOrder = existingRows[0];
+  if (existingOrder?.status === "refunded" || existingOrder?.mercado_pago_refund_id) {
+    return existingOrder;
+  }
+  const alreadyConfirmed = existingOrder?.status === "payment_confirmed";
 
-  const status = payment.status === "approved"
+  const status = ["refunded", "charged_back"].includes(payment.status)
+    ? "refunded"
+    : payment.status === "approved"
     ? "payment_confirmed"
     : ["cancelled", "rejected"].includes(payment.status)
       ? "payment_failed"
@@ -509,6 +526,7 @@ export async function syncMercadoPagoPayment(env, payment) {
         payment_provider: "mercado_pago",
         mercado_pago_payment_id: String(payment.id),
         paid_at: status === "payment_confirmed" ? new Date().toISOString() : null,
+        refunded_at: status === "refunded" ? new Date().toISOString() : null,
       }),
     },
   );
