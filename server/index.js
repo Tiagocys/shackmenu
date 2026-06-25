@@ -23,6 +23,7 @@ import {
 import {
   getOwnerDeliveryCities,
   replaceOwnerDeliveryCities,
+  updateOwnerDeliveryFee,
   validateCepForRestaurant,
 } from "../functions/_lib/delivery.js";
 import {
@@ -308,7 +309,7 @@ app.post("/api/billing/webhook", async (request, response) => {
 app.get("/api/connect/status", authenticate, async (request, response) => {
   try {
     const restaurant = await getOwnerRestaurant(process.env, request.user.id);
-    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
+    if (!restaurant) return response.status(404).json({ error: "Loja não encontrada." });
     const account = await getOwnerMercadoPagoAccount(process.env, request.user.id);
     return response.json({ payment: publicMercadoPagoStatus(account) });
   } catch (error) {
@@ -320,7 +321,7 @@ app.get("/api/connect/status", authenticate, async (request, response) => {
 app.post("/api/connect/onboarding", authenticate, async (request, response) => {
   try {
     const restaurant = await getOwnerRestaurant(process.env, request.user.id);
-    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
+    if (!restaurant) return response.status(404).json({ error: "Loja não encontrada." });
     const url = await createMercadoPagoOnboardingUrl(
       process.env,
       request.user,
@@ -369,7 +370,7 @@ app.post("/api/orders/checkout", async (request, response) => {
     console.error("Could not create order checkout", error);
     const expected = [
       "Cardápio não encontrado.",
-      "Este restaurante ainda não liberou pagamento online.",
+      "Esta loja ainda não liberou pagamento online.",
       "Pedido vazio.",
       "Nenhum produto válido encontrado.",
       "Informe o nome para o pedido.",
@@ -378,10 +379,10 @@ app.post("/api/orders/checkout", async (request, response) => {
       "CEP não encontrado.",
       "Não foi possível consultar o CEP.",
       "Informe o número ou complemento da entrega.",
-      "Este restaurante ainda não configurou as cidades de entrega.",
+      "Esta loja ainda não configurou as cidades de entrega.",
       "Mercado Pago não está configurado.",
     ];
-    const expectedError = expected.includes(error.message) || error.message?.startsWith("Este restaurante não entrega em ");
+    const expectedError = expected.includes(error.message) || error.message?.startsWith("Esta loja não entrega em ");
     return response.status(expectedError ? 400 : 500).json({
       error: expectedError
         ? error.message
@@ -434,7 +435,11 @@ app.post("/api/orders/refund", authenticate, async (request, response) => {
 
 app.get("/api/delivery-cities", authenticate, async (request, response) => {
   try {
-    return response.json({ cities: await getOwnerDeliveryCities(process.env, request.user.id) });
+    const restaurant = await getOwnerRestaurant(process.env, request.user.id);
+    return response.json({
+      cities: await getOwnerDeliveryCities(process.env, request.user.id),
+      deliveryFeeCents: restaurant?.delivery_fee_cents || 0,
+    });
   } catch (error) {
     console.error("Could not read delivery cities", error);
     return response.status(500).json({ error: "Não foi possível carregar as cidades de entrega." });
@@ -444,14 +449,17 @@ app.get("/api/delivery-cities", authenticate, async (request, response) => {
 app.put("/api/delivery-cities", authenticate, async (request, response) => {
   try {
     const restaurant = await getOwnerRestaurant(process.env, request.user.id);
-    if (!restaurant) return response.status(404).json({ error: "Restaurante não encontrado." });
-    const cities = await replaceOwnerDeliveryCities(
-      process.env,
-      request.user.id,
-      restaurant.id,
-      request.body?.cities,
-    );
-    return response.json({ cities });
+    if (!restaurant) return response.status(404).json({ error: "Loja não encontrada." });
+    const [cities, updatedRestaurant] = await Promise.all([
+      replaceOwnerDeliveryCities(
+        process.env,
+        request.user.id,
+        restaurant.id,
+        request.body?.cities,
+      ),
+      updateOwnerDeliveryFee(process.env, request.user.id, restaurant.id, request.body?.deliveryFeeCents),
+    ]);
+    return response.json({ cities, deliveryFeeCents: updatedRestaurant?.delivery_fee_cents || 0 });
   } catch (error) {
     console.error("Could not save delivery cities", error);
     return response.status(500).json({ error: "Não foi possível salvar as cidades de entrega." });
@@ -461,7 +469,7 @@ app.put("/api/delivery-cities", authenticate, async (request, response) => {
 app.post("/api/delivery-check", async (request, response) => {
   try {
     const restaurantId = String(request.body?.restaurantId || "").trim();
-    if (!restaurantId) return response.status(400).json({ error: "Restaurante não informado." });
+    if (!restaurantId) return response.status(400).json({ error: "Loja não informada." });
     const address = await validateCepForRestaurant(process.env, restaurantId, request.body?.cep);
     return response.json({ address });
   } catch (error) {
@@ -469,9 +477,9 @@ app.post("/api/delivery-check", async (request, response) => {
       "Informe um CEP com 8 dígitos.",
       "CEP não encontrado.",
       "Não foi possível consultar o CEP.",
-      "Este restaurante ainda não configurou as cidades de entrega.",
+      "Esta loja ainda não configurou as cidades de entrega.",
     ];
-    const expectedError = expected.includes(error.message) || error.message?.startsWith("Este restaurante não entrega em ");
+    const expectedError = expected.includes(error.message) || error.message?.startsWith("Esta loja não entrega em ");
     if (expectedError) return response.status(400).json({ error: error.message });
     console.error("Could not validate delivery CEP", error);
     return response.status(500).json({ error: "Não foi possível validar a entrega." });

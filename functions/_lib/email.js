@@ -63,6 +63,14 @@ function formatDeliveryAddress(order) {
   ].filter(Boolean).join(" - ");
 }
 
+function getDeliveryFee(order) {
+  return Math.max(0, Number(order.delivery_fee_cents || 0));
+}
+
+function getOrderTotal(order) {
+  return Number(order.subtotal_cents || 0) + getDeliveryFee(order);
+}
+
 function buildCustomerEmail(env, order) {
   const logoUrl = getLogoUrl(env, order);
   const contact = getRestaurantContact(order);
@@ -77,10 +85,12 @@ function buildCustomerEmail(env, order) {
     buildItemsText(order),
     "",
     `Subtotal: ${formatPrice(order.subtotal_cents)}`,
+    getDeliveryFee(order) > 0 ? `Entrega: ${formatPrice(getDeliveryFee(order))}` : "Entrega: grátis",
+    `Total: ${formatPrice(getOrderTotal(order))}`,
     order.notes ? `Observações: ${order.notes}` : "",
     "",
-    "Contato do restaurante:",
-    contact.length ? contact.join("\n") : "O restaurante entrará em contato pelos dados informados no pedido.",
+    "Contato da loja:",
+    contact.length ? contact.join("\n") : "A loja entrará em contato pelos dados informados no pedido.",
   ].filter(Boolean).join("\n");
 
   const html = `
@@ -91,13 +101,15 @@ function buildCustomerEmail(env, order) {
         <p style="margin:0 0 8px;color:#7a6d5d;font-size:13px;text-transform:uppercase;letter-spacing:.08em;">Pedido recebido</p>
         <h1 style="margin:0 0 12px;font-size:26px;">Seu pedido em ${escapeHtml(order.restaurant_name)} foi recebido</h1>
         <p style="margin:0 0 12px;color:#7a6d5d;font-size:14px;">Número do pedido: <strong>#${escapeHtml(order.order_number)}</strong></p>
-        <p style="margin:0 0 22px;font-size:16px;line-height:1.5;">Já recebemos seu pedido em <strong>${escapeHtml(order.restaurant_name)}</strong>. O restaurante vai trabalhar nele em breve.</p>
+        <p style="margin:0 0 22px;font-size:16px;line-height:1.5;">Já recebemos seu pedido em <strong>${escapeHtml(order.restaurant_name)}</strong>. A loja vai trabalhar nele em breve.</p>
         <table style="width:100%;border-collapse:collapse;margin:8px 0 18px;">${buildItemsHtml(order)}</table>
-        <p style="font-size:18px;margin:0 0 20px;text-align:right;"><strong>Subtotal: ${formatPrice(order.subtotal_cents)}</strong></p>
+        <p style="font-size:14px;margin:0 0 6px;text-align:right;color:#7a6d5d;">Subtotal: ${formatPrice(order.subtotal_cents)}</p>
+        <p style="font-size:14px;margin:0 0 8px;text-align:right;color:#7a6d5d;">Entrega: ${getDeliveryFee(order) > 0 ? formatPrice(getDeliveryFee(order)) : "grátis"}</p>
+        <p style="font-size:18px;margin:0 0 20px;text-align:right;"><strong>Total: ${formatPrice(getOrderTotal(order))}</strong></p>
         ${order.notes ? `<p style="background:#f6f2ea;border-radius:12px;padding:14px;"><strong>Observações:</strong><br>${escapeHtml(order.notes)}</p>` : ""}
         <div style="border-top:1px solid #eee;margin-top:22px;padding-top:18px;">
-          <p style="margin:0 0 8px;"><strong>Contato do restaurante</strong></p>
-          <p style="margin:0;color:#5d5245;line-height:1.5;">${contact.length ? contact.map(escapeHtml).join("<br>") : "O restaurante entrará em contato pelos dados informados no pedido."}</p>
+          <p style="margin:0 0 8px;"><strong>Contato da loja</strong></p>
+          <p style="margin:0;color:#5d5245;line-height:1.5;">${contact.length ? contact.map(escapeHtml).join("<br>") : "A loja entrará em contato pelos dados informados no pedido."}</p>
         </div>
       </div>
     </div>
@@ -124,6 +136,8 @@ function buildMerchantEmail(order) {
     buildItemsText(order),
     "",
     `Subtotal: ${formatPrice(order.subtotal_cents)}`,
+    getDeliveryFee(order) > 0 ? `Entrega: ${formatPrice(getDeliveryFee(order))}` : "Entrega: grátis",
+    `Total: ${formatPrice(getOrderTotal(order))}`,
     order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "Sem taxa Shack Menu",
     order.notes ? `Observações: ${order.notes}` : "",
   ].filter(Boolean).join("\n");
@@ -135,7 +149,9 @@ function buildMerchantEmail(order) {
         <h1 style="margin:0 0 12px;font-size:26px;">Pedido #${escapeHtml(order.order_number)}</h1>
         <p style="margin:0 0 18px;line-height:1.5;"><strong>Cliente:</strong> ${escapeHtml(order.customer_name)}<br><strong>E-mail:</strong> ${escapeHtml(order.customer_email)}${order.customer_phone ? `<br><strong>Telefone:</strong> ${escapeHtml(order.customer_phone)}` : ""}${formatDeliveryAddress(order) ? `<br><strong>Entrega:</strong> ${escapeHtml(formatDeliveryAddress(order))}` : ""}</p>
         <table style="width:100%;border-collapse:collapse;margin:8px 0 18px;">${buildItemsHtml(order)}</table>
-        <p style="font-size:18px;margin:0 0 8px;text-align:right;"><strong>Subtotal: ${formatPrice(order.subtotal_cents)}</strong></p>
+        <p style="font-size:14px;margin:0 0 6px;text-align:right;color:#7a6d5d;">Subtotal: ${formatPrice(order.subtotal_cents)}</p>
+        <p style="font-size:14px;margin:0 0 8px;text-align:right;color:#7a6d5d;">Entrega: ${getDeliveryFee(order) > 0 ? formatPrice(getDeliveryFee(order)) : "grátis"}</p>
+        <p style="font-size:18px;margin:0 0 8px;text-align:right;"><strong>Total: ${formatPrice(getOrderTotal(order))}</strong></p>
         <p style="margin:0 0 20px;text-align:right;color:#7a6d5d;">${order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "Sem taxa Shack Menu"}</p>
         ${order.notes ? `<p style="background:#f6f2ea;border-radius:12px;padding:14px;"><strong>Observações:</strong><br>${escapeHtml(order.notes)}</p>` : ""}
       </div>

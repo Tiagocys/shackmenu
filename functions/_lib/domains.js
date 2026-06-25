@@ -156,9 +156,9 @@ export function customDomainError(error) {
   const code = error.message || "";
   if (code === "INVALID_CUSTOM_DOMAIN") return { status: 400, message: "Informe um domínio válido." };
   if (code === "CUSTOM_DOMAIN_REQUIRES_PRO") return { status: 403, message: "O domínio próprio está disponível apenas no plano Pro." };
-  if (code === "RESTAURANT_NOT_FOUND") return { status: 404, message: "Restaurante não encontrado." };
+  if (code === "RESTAURANT_NOT_FOUND") return { status: 404, message: "Loja não encontrada." };
   if (code.includes("already exists") || code.includes("already been claimed")) {
-    return { status: 409, message: "Este domínio já está conectado a outro serviço ou restaurante." };
+    return { status: 409, message: "Este domínio já está conectado a outro serviço ou loja." };
   }
   if (code === "CLOUDFLARE_SAAS_NOT_CONFIGURED") return { status: 503, message: "A integração de domínios ainda não está configurada." };
   console.error("Custom domain integration error", error);

@@ -79,7 +79,7 @@ export async function listAdminCustomers(env) {
     return {
       ownerId: subscription.owner_id,
       email: user?.email || "Email indisponível",
-      restaurant: restaurant?.name || "Restaurante sem nome",
+      restaurant: restaurant?.name || "Loja sem nome",
       customDomain: restaurant?.custom_domain || null,
       subscriptionStatus: subscription.status,
       currentPeriodEnd: subscription.current_period_end,

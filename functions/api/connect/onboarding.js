@@ -10,7 +10,7 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const restaurant = await getOwnerRestaurant(env, authentication.user.id);
-    if (!restaurant) return json({ error: "Restaurante não encontrado." }, 404);
+    if (!restaurant) return json({ error: "Loja não encontrada." }, 404);
 
     const url = await createMercadoPagoOnboardingUrl(
       env,

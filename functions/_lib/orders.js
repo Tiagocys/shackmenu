@@ -35,7 +35,7 @@ function getOrderReturnUrl(returnUrl, fallbackOrigin, slug, status) {
 async function getPublicRestaurantForOrder(env, restaurantId) {
   const records = await supabaseAdminRequest(
     env,
-    `rest/v1/restaurants?select=id,owner_id,name,slug,published_at,whatsapp_number&published_at=not.is.null&id=eq.${encodeURIComponent(restaurantId)}&limit=1`,
+    `rest/v1/restaurants?select=id,owner_id,name,slug,published_at,whatsapp_number,delivery_fee_cents&published_at=not.is.null&id=eq.${encodeURIComponent(restaurantId)}&limit=1`,
   );
   return records[0] || null;
 }
@@ -92,6 +92,8 @@ async function createOrderRecord(env, body) {
   if (!items.length) throw new Error("Nenhum produto válido encontrado.");
 
   const subtotal = items.reduce((total, item) => total + item.subtotal_cents, 0);
+  const deliveryFee = Math.max(0, Number(restaurant.delivery_fee_cents || 0));
+  const payableTotal = subtotal + deliveryFee;
   const customerName = sanitizeLine(body.customerName, 100);
   const customerEmail = sanitizeLine(body.customerEmail, 120).toLowerCase();
   if (customerName.length < 2) throw new Error("Informe o nome para o pedido.");
@@ -103,7 +105,7 @@ async function createOrderRecord(env, body) {
 
   const isPro = await isOwnerPro(env, restaurant.owner_id);
   const feePercent = getApplicationFeePercent(isPro, env);
-  const platformFee = Math.round((subtotal * feePercent) / 100);
+  const platformFee = Math.round((payableTotal * feePercent) / 100);
 
   const orderRows = await supabaseAdminRequest(env, "rest/v1/orders", {
     method: "POST",
@@ -120,6 +122,7 @@ async function createOrderRecord(env, body) {
       delivery_address: deliveryAddress.address,
       delivery_neighborhood: deliveryAddress.neighborhood,
       delivery_complement: deliveryAddress.complement,
+      delivery_fee_cents: deliveryFee,
       notes: sanitizeLine(body.notes, 500) || null,
       items,
       subtotal_cents: subtotal,
@@ -138,6 +141,7 @@ async function createOrderRecord(env, body) {
     customerPhone: body.customerPhone,
     customerDocument: normalizeCpf(body.customerDocument),
     subtotal,
+    deliveryFee,
     platformFee,
   };
 }
@@ -175,14 +179,14 @@ export async function createMercadoPagoOrderCheckoutSession(env, body, origin) {
 }
 
 export async function createOrderCheckoutSession(env, body, origin) {
-  const { restaurant, items, order, customerEmail, platformFee } = await createOrderRecord(env, {
+  const { restaurant, items, order, customerEmail, platformFee, deliveryFee } = await createOrderRecord(env, {
     ...body,
     paymentProvider: "stripe",
   });
 
   const settings = await getActivePaymentSettings(env, restaurant.id);
   if (!settings?.stripe_account_id) {
-    throw new Error("Este restaurante ainda não liberou pagamento online.");
+    throw new Error("Esta loja ainda não liberou pagamento online.");
   }
 
   await supabaseAdminRequest(
@@ -219,6 +223,13 @@ export async function createOrderCheckoutSession(env, body, origin) {
     parameters[`line_items[${index}][price_data][unit_amount]`] = String(item.unit_amount_cents);
     parameters[`line_items[${index}][price_data][product_data][name]`] = item.name;
   });
+  if (deliveryFee > 0) {
+    const index = items.length;
+    parameters[`line_items[${index}][quantity]`] = "1";
+    parameters[`line_items[${index}][price_data][currency]`] = "brl";
+    parameters[`line_items[${index}][price_data][unit_amount]`] = String(deliveryFee);
+    parameters[`line_items[${index}][price_data][product_data][name]`] = "Taxa de entrega";
+  }
 
   const session = await stripeRequest(env, "/checkout/sessions", parameters);
   await supabaseAdminRequest(
@@ -276,7 +287,7 @@ export async function markOrderPaymentFailed(env, session) {
 export async function listOwnerOrders(env, ownerId) {
   return supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=id,order_number,status,payment_provider,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,currency,paid_at,created_at,mercado_pago_payment_id,mercado_pago_refund_id,mercado_pago_refund_status,refunded_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=50`,
+    `rest/v1/orders?select=id,order_number,status,payment_provider,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,delivery_fee_cents,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,currency,paid_at,created_at,mercado_pago_payment_id,mercado_pago_refund_id,mercado_pago_refund_status,refunded_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=created_at.desc&limit=50`,
   );
 }
 
@@ -335,7 +346,7 @@ export async function refundMercadoPagoOrder(env, ownerId, orderId) {
 export async function getOrderNotificationDetails(env, orderId) {
   const orders = await supabaseAdminRequest(
     env,
-    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,background_color,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
+    `rest/v1/orders?select=id,order_number,status,customer_name,customer_email,customer_phone,delivery_cep,delivery_city,delivery_state,delivery_address,delivery_neighborhood,delivery_complement,delivery_fee_cents,notes,items,subtotal_cents,platform_fee_cents,platform_fee_percent,created_at,restaurants(name,logo_key,background_color,contact_email,whatsapp_number,instagram_username)&id=eq.${encodeURIComponent(orderId)}&limit=1`,
   );
   const order = orders[0];
   if (!order) throw new Error("Pedido não encontrado para notificação.");

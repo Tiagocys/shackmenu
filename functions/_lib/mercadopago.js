@@ -340,6 +340,26 @@ function buildPayer({ customerName, customerEmail, customerPhone, customerDocume
   };
 }
 
+function buildPreferenceItems(items, order) {
+  const preferenceItems = items.map((item) => ({
+    id: item.product_id,
+    title: item.name,
+    currency_id: "BRL",
+    quantity: item.quantity,
+    unit_price: centsToAmount(item.unit_amount_cents),
+  }));
+  if (Number(order.delivery_fee_cents || 0) > 0) {
+    preferenceItems.push({
+      id: "delivery_fee",
+      title: "Taxa de entrega",
+      currency_id: "BRL",
+      quantity: 1,
+      unit_price: centsToAmount(order.delivery_fee_cents),
+    });
+  }
+  return preferenceItems;
+}
+
 export async function createMercadoPagoPreference(env, {
   order,
   restaurant,
@@ -352,7 +372,13 @@ export async function createMercadoPagoPreference(env, {
   returnUrl,
 }) {
   const testMode = isMercadoPagoTestMode(env);
-  const account = testMode ? null : await getValidMercadoPagoAccount(env, restaurant.id);
+  let account = null;
+  try {
+    account = await getValidMercadoPagoAccount(env, restaurant.id);
+  } catch (error) {
+    if (!testMode) throw error;
+  }
+  const hasSellerAccount = Boolean(account?.access_token);
   const baseUrl = env.PUBLIC_APP_URL || origin;
   const backUrl = new URL(returnUrl || `/m/${restaurant.slug}`, baseUrl);
   const successUrl = new URL(backUrl);
@@ -372,20 +398,14 @@ export async function createMercadoPagoPreference(env, {
       pending: pendingUrl.toString(),
     },
     auto_return: "approved",
-    marketplace_fee: !testMode && order.platform_fee_cents > 0
+    marketplace_fee: hasSellerAccount && order.platform_fee_cents > 0
       ? centsToAmount(order.platform_fee_cents)
       : undefined,
     payment_methods: {
       installments: 1,
       default_installments: 1,
     },
-    items: items.map((item) => ({
-      id: item.product_id,
-      title: item.name,
-      currency_id: "BRL",
-      quantity: item.quantity,
-      unit_price: centsToAmount(item.unit_amount_cents),
-    })),
+    items: buildPreferenceItems(items, order),
     metadata: {
       order_id: order.id,
       restaurant_id: restaurant.id,
@@ -404,7 +424,7 @@ export async function createMercadoPagoPreference(env, {
 
   const preference = await mercadoPagoRequest(env, "/checkout/preferences", {
     method: "POST",
-    accessToken: testMode ? getMercadoPagoToken(env) : account.access_token,
+    accessToken: hasSellerAccount ? account.access_token : getMercadoPagoToken(env),
     body,
   });
 

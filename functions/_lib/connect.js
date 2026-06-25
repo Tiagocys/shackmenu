@@ -29,7 +29,7 @@ export function parseStripeAccountStatus(account) {
 export async function getOwnerRestaurant(env, ownerId) {
   const restaurants = await supabaseAdminRequest(
     env,
-    `rest/v1/restaurants?select=id,owner_id,name,slug,whatsapp_number&owner_id=eq.${encodeURIComponent(ownerId)}&limit=1`,
+    `rest/v1/restaurants?select=id,owner_id,name,slug,whatsapp_number,delivery_fee_cents&owner_id=eq.${encodeURIComponent(ownerId)}&limit=1`,
   );
   return restaurants[0] || null;
 }

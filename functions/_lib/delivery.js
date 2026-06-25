@@ -22,6 +22,12 @@ export function sanitizeAddressComplement(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 120);
 }
 
+export function sanitizeDeliveryFeeCents(value) {
+  const cents = Number(value);
+  if (!Number.isFinite(cents)) return 0;
+  return Math.min(99900, Math.max(0, Math.round(cents)));
+}
+
 export async function lookupCep(cep) {
   const cleanCep = sanitizeCep(cep);
   if (cleanCep.length !== 8) throw new Error("Informe um CEP com 8 dígitos.");
@@ -47,6 +53,19 @@ export async function getOwnerDeliveryCities(env, ownerId) {
     env,
     `rest/v1/restaurant_delivery_cities?select=id,city,state,cep,normalized_city,created_at&owner_id=eq.${encodeURIComponent(ownerId)}&order=state.asc,city.asc`,
   );
+}
+
+export async function updateOwnerDeliveryFee(env, ownerId, restaurantId, deliveryFeeCents) {
+  const rows = await supabaseAdminRequest(
+    env,
+    `rest/v1/restaurants?id=eq.${encodeURIComponent(restaurantId)}&owner_id=eq.${encodeURIComponent(ownerId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ delivery_fee_cents: sanitizeDeliveryFeeCents(deliveryFeeCents) }),
+    },
+  );
+  return rows[0] || null;
 }
 
 export async function replaceOwnerDeliveryCeps(env, ownerId, restaurantId, ceps) {
@@ -132,7 +151,7 @@ export async function validateCepForRestaurant(env, restaurantId, cep) {
     `rest/v1/restaurant_delivery_cities?select=city,state,normalized_city&restaurant_id=eq.${encodeURIComponent(restaurantId)}`,
   );
   if (!cities.length) {
-    throw new Error("Este restaurante ainda não configurou as cidades de entrega.");
+    throw new Error("Esta loja ainda não configurou as cidades de entrega.");
   }
 
   const normalizedCepCity = normalizeCity(address.city);
@@ -140,7 +159,7 @@ export async function validateCepForRestaurant(env, restaurantId, cep) {
     city.state === address.state && city.normalized_city === normalizedCepCity
   ));
   if (!match) {
-    throw new Error(`Este restaurante não entrega em ${address.city}/${address.state}.`);
+    throw new Error(`Esta loja não entrega em ${address.city}/${address.state}.`);
   }
   return address;
 }

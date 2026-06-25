@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
+const defaultDocumentTitle = "Shack Menu";
+const defaultMetaDescription = "Crie o cardápio digital da sua loja com o Shack Menu.";
+const metaDescription = document.querySelector('meta[name="description"]');
+
 const views = {
   loading: document.querySelector("#loading-view"),
   login: document.querySelector("#login-view"),
@@ -82,6 +86,8 @@ const publicCartClose = document.querySelector("#public-cart-close");
 const publicCartItems = document.querySelector("#public-cart-items");
 const publicCartEmpty = document.querySelector("#public-cart-empty");
 const publicCartSummary = document.querySelector("#public-cart-summary");
+const publicCartSubtotal = document.querySelector("#public-cart-subtotal");
+const publicCartDelivery = document.querySelector("#public-cart-delivery");
 const publicCartTotal = document.querySelector("#public-cart-total");
 const publicCustomerName = document.querySelector("#public-customer-name");
 const publicCustomerEmail = document.querySelector("#public-customer-email");
@@ -156,6 +162,7 @@ const deliveryCityState = document.querySelector("#delivery-city-state");
 const deliveryCitiesList = document.querySelector("#delivery-cities-list");
 const deliveryCitiesEmpty = document.querySelector("#delivery-cities-empty");
 const deliveryCitiesSave = document.querySelector("#delivery-cities-save");
+const deliveryFee = document.querySelector("#delivery-fee");
 const connectCard = document.querySelector("#connect-card");
 const connectTitle = document.querySelector("#connect-title");
 const connectCopy = document.querySelector("#connect-copy");
@@ -192,6 +199,7 @@ let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
 let activePublicMenu = null;
 let publicCart = [];
 let deliveryCities = [];
+let deliveryFeeCents = 0;
 let ibgeStates = [];
 let ibgeCitiesByState = new Map();
 let publicDeliveryAddress = null;
@@ -209,6 +217,7 @@ function showView(name) {
     element.classList.toggle("hidden", viewName !== name);
   });
   const publicView = ["loading", "login", "terms", "publicMenu"].includes(name);
+  siteHeader.classList.toggle("hidden", name === "publicMenu");
   signOutButton.classList.toggle("hidden", publicView);
   supportFooter.classList.toggle("hidden", name === "loading" || name === "publicMenu");
   adminButton.classList.toggle("hidden", publicView || name === "admin" || !adminAccess);
@@ -216,11 +225,38 @@ function showView(name) {
   customizeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "settings" || !currentRestaurant);
   upgradeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "upgrade" || !currentRestaurant);
   upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
+  if (name !== "publicMenu") {
+    document.title = defaultDocumentTitle;
+    if (metaDescription) metaDescription.content = defaultMetaDescription;
+  }
   activeViewName = name;
 }
 
 function getPaidOrders(orders) {
   return orders.filter((order) => order.status === "payment_confirmed");
+}
+
+function getOrdersSeenStorageKey() {
+  return currentUser && currentRestaurant
+    ? `shackmenu:orders-seen:${currentUser.id}:${currentRestaurant.id}`
+    : null;
+}
+
+function getLastSeenPaidOrderTime() {
+  const key = getOrdersSeenStorageKey();
+  if (!key) return 0;
+  return Number(localStorage.getItem(key) || 0);
+}
+
+function markPaidOrdersSeen(orders = []) {
+  const key = getOrdersSeenStorageKey();
+  if (!key) return;
+  const latestTime = Math.max(
+    0,
+    ...getPaidOrders(orders).map((order) => new Date(order.created_at || 0).getTime()),
+  );
+  if (latestTime) localStorage.setItem(key, String(latestTime));
+  updateOrdersBadge(orders);
 }
 
 function getOrdersForTab(orders, tab) {
@@ -253,7 +289,10 @@ function updateOrdersTabs(orders) {
 }
 
 function updateOrdersBadge(orders = []) {
-  const count = getPaidOrders(orders).length;
+  const lastSeenTime = getLastSeenPaidOrderTime();
+  const count = getPaidOrders(orders).filter((order) => (
+    new Date(order.created_at || 0).getTime() > lastSeenTime
+  )).length;
   ordersBadge.textContent = String(Math.min(count, 99));
   ordersBadge.classList.toggle("hidden", count === 0);
 }
@@ -289,8 +328,9 @@ async function requestOrderNotificationPermission() {
 function notifyNewPaidOrder(order) {
   playOrderNotificationSound();
   if ("Notification" in window && Notification.permission === "granted") {
+    const totalCents = Number(order.subtotal_cents || 0) + Number(order.delivery_fee_cents || 0);
     new Notification(`Pedido pago #${order.order_number}`, {
-      body: `${order.customer_name} - ${formatPrice(order.subtotal_cents)}`,
+      body: `${order.customer_name} - ${formatPrice(totalCents)}`,
       icon: "/assets/icons/bell.svg",
     });
   }
@@ -456,6 +496,8 @@ function renderDeliveryCities() {
 async function loadDeliveryCities() {
   const result = await authenticatedApi("/api/delivery-cities");
   deliveryCities = result.cities || [];
+  deliveryFeeCents = Number(result.deliveryFeeCents || 0);
+  deliveryFee.value = deliveryFeeCents ? String((deliveryFeeCents / 100).toFixed(2)).replace(".", ",") : "0";
   renderDeliveryCities();
 }
 
@@ -499,9 +541,14 @@ async function saveDeliveryCities() {
   try {
     const result = await authenticatedApi("/api/delivery-cities", {
       method: "PUT",
-      body: JSON.stringify({ cities: deliveryCities }),
+      body: JSON.stringify({
+        cities: deliveryCities,
+        deliveryFeeCents: parseOptionalPriceToCents(deliveryFee.value),
+      }),
     });
     deliveryCities = result.cities || [];
+    deliveryFeeCents = Number(result.deliveryFeeCents || 0);
+    deliveryFee.value = deliveryFeeCents ? String((deliveryFeeCents / 100).toFixed(2)).replace(".", ",") : "0";
     renderDeliveryCities();
     ordersSuccess.textContent = "Cidades de entrega salvas.";
     ordersSuccess.classList.remove("hidden");
@@ -736,13 +783,19 @@ function renderOrders(orders) {
 
     const totals = document.createElement("div");
     totals.className = "order-totals";
+    const deliveryFeeValue = Number(order.delivery_fee_cents || 0);
+    const totalCents = Number(order.subtotal_cents || 0) + deliveryFeeValue;
     const subtotal = document.createElement("span");
     subtotal.textContent = `Subtotal ${formatPrice(order.subtotal_cents)}`;
+    const deliveryFeeLine = document.createElement("span");
+    deliveryFeeLine.textContent = `Entrega ${deliveryFeeValue > 0 ? formatPrice(deliveryFeeValue) : "grátis"}`;
+    const total = document.createElement("span");
+    total.textContent = `Total ${formatPrice(totalCents)}`;
     const fee = document.createElement("span");
     fee.textContent = order.platform_fee_percent > 0
       ? `Taxa Shack Menu ${order.platform_fee_percent}%: ${formatPrice(order.platform_fee_cents)}`
       : "Sem taxa Shack Menu";
-    totals.append(subtotal, fee);
+    totals.append(subtotal, deliveryFeeLine, total, fee);
 
     const actions = document.createElement("div");
     actions.className = "order-actions";
@@ -784,6 +837,7 @@ async function loadOrders() {
     ]);
     renderConnectStatus(connectResult.payment);
     renderOrders(ordersResult.orders || []);
+    if (activeViewName === "orders") markPaidOrdersSeen(ordersResult.orders || []);
     const latestPaidOrder = getPaidOrders(ordersResult.orders || [])[0];
     if (latestPaidOrder) lastPaidOrderId = latestPaidOrder.id;
   } catch (error) {
@@ -810,13 +864,16 @@ async function refreshOrdersBadge({ notify = false } = {}) {
   try {
     const result = await authenticatedApi("/api/orders");
     const orders = result.orders || [];
-    updateOrdersBadge(orders);
+    if (activeViewName !== "orders") updateOrdersBadge(orders);
     const latestPaidOrder = getPaidOrders(orders)[0];
     if (notify && latestPaidOrder && lastPaidOrderId && latestPaidOrder.id !== lastPaidOrderId) {
       notifyNewPaidOrder(latestPaidOrder);
     }
     if (latestPaidOrder) lastPaidOrderId = latestPaidOrder.id;
-    if (activeViewName === "orders") renderOrders(orders);
+    if (activeViewName === "orders") {
+      renderOrders(orders);
+      markPaidOrdersSeen(orders);
+    }
   } catch (error) {
     console.error("Could not refresh order notifications", error);
   }
@@ -1005,7 +1062,7 @@ function updateThemePreview() {
     ? themeColorText.value
     : themeColor.value;
   themePreview.style.backgroundColor = color;
-  themePreviewName.textContent = settingsRestaurantName.value.trim() || currentRestaurant?.name || "Seu restaurante";
+  themePreviewName.textContent = settingsRestaurantName.value.trim() || currentRestaurant?.name || "Sua loja";
   themePreviewTagline.textContent = settingsMenuTagline.value.trim() || "Escolha seus favoritos.";
 }
 
@@ -1314,6 +1371,10 @@ function getPublicCartDetails() {
   });
 }
 
+function getPublicDeliveryFee() {
+  return Math.max(0, Number(activePublicMenu?.restaurant?.delivery_fee_cents || 0));
+}
+
 function updatePublicCartItem(productId, change) {
   const item = publicCart.find((cartItem) => cartItem.productId === productId);
   if (!item && change > 0) publicCart.push({ productId, quantity: 1 });
@@ -1339,11 +1400,15 @@ function renderPublicCart() {
   const details = getPublicCartDetails();
   const itemCount = details.reduce((total, item) => total + item.quantity, 0);
   const subtotal = details.reduce((total, item) => total + item.subtotal, 0);
+  const deliveryFeeValue = getPublicDeliveryFee();
+  const total = subtotal + deliveryFeeValue;
   publicCartCount.textContent = `${itemCount} ${itemCount === 1 ? "item" : "itens"}`;
   publicCartItems.replaceChildren();
   publicCartEmpty.classList.toggle("hidden", details.length > 0);
   publicCartSummary.classList.toggle("hidden", details.length === 0);
-  publicCartTotal.textContent = formatPrice(subtotal);
+  publicCartSubtotal.textContent = formatPrice(subtotal);
+  publicCartDelivery.textContent = deliveryFeeValue > 0 ? formatPrice(deliveryFeeValue) : "Grátis";
+  publicCartTotal.textContent = formatPrice(total);
 
   details.forEach(({ product, quantity, subtotal: itemSubtotal }) => {
     const item = document.createElement("article");
@@ -1381,12 +1446,15 @@ function sendPublicCartToWhatsapp() {
   if (!details.length) return;
 
   const subtotal = details.reduce((total, item) => total + item.subtotal, 0);
+  const deliveryFeeValue = getPublicDeliveryFee();
   const lines = [
     `Olá! Gostaria de fazer um pedido no ${activePublicMenu.restaurant.name}:`,
     "",
     ...details.map(({ product, quantity, subtotal: itemSubtotal }) => `• ${quantity}x ${product.name} — ${formatPrice(itemSubtotal)}`),
     "",
     `Subtotal: ${formatPrice(subtotal)}`,
+    `Entrega: ${deliveryFeeValue > 0 ? formatPrice(deliveryFeeValue) : "Grátis"}`,
+    `Total: ${formatPrice(subtotal + deliveryFeeValue)}`,
   ];
   const notes = publicOrderNotes.value.trim();
   if (notes) lines.push("", `Observações: ${notes}`);
@@ -1433,7 +1501,7 @@ async function checkoutPublicCart() {
     return;
   }
   if (activePublicMenu.restaurant.delivery_cities?.length === 0) {
-    alert("Este restaurante ainda não configurou as cidades de entrega.");
+    alert("Esta loja ainda não configurou as cidades de entrega.");
     return;
   }
 
@@ -1524,7 +1592,11 @@ function renderPublicMenu(menu) {
   loadPublicDeliveryAddress();
   loadPublicCart();
   const visibleCategories = menu.categories.filter((category) => category.products.length > 0);
-  siteHeader.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
+  document.title = menu.restaurant.name;
+  if (metaDescription) {
+    metaDescription.content = `${menu.restaurant.name}: cardápio digital, produtos e pedidos online.`;
+  }
+  siteHeader.classList.add("hidden");
   const backgroundColor = menu.restaurant.background_color || "#f4f1e9";
   views.publicMenu.style.setProperty("--menu-background", backgroundColor);
   views.publicMenu.style.setProperty("--menu-foreground", getContrastColor(backgroundColor));
@@ -1532,7 +1604,7 @@ function renderPublicMenu(menu) {
   publicMenuTagline.textContent = menu.restaurant.menu_tagline || "Escolha seus favoritos.";
   publicCategoryNav.replaceChildren();
   publicMenuContent.replaceChildren();
-  publicMenuFooter.classList.toggle("hidden", Boolean(menu.restaurant.is_pro));
+  publicMenuFooter.classList.add("hidden");
   publicRestaurantLogo.classList.add("hidden");
   publicWhatsapp.classList.add("hidden");
   publicInstagram.classList.add("hidden");
@@ -1601,8 +1673,8 @@ function renderPublicMenu(menu) {
     savePublicCart();
     window.history.replaceState({}, "", window.location.pathname);
     const message = orderNumber
-      ? `Pedido #${orderNumber} confirmado. Anote esse número para acompanhar com o restaurante. Também enviamos os detalhes por e-mail.`
-      : "Pedido confirmado. Anote essa confirmação para acompanhar com o restaurante. Também enviamos os detalhes por e-mail.";
+      ? `Pedido #${orderNumber} confirmado. Anote esse número para acompanhar com a loja. Também enviamos os detalhes por e-mail.`
+      : "Pedido confirmado. Anote essa confirmação para acompanhar com a loja. Também enviamos os detalhes por e-mail.";
     window.setTimeout(() => alert(message), 200);
   } else if (orderStatus === "cancelled") {
     localStorage.removeItem(pendingPublicOrderKey);
@@ -1706,6 +1778,18 @@ function parsePriceToCents(value) {
   if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
   const cents = Math.round(Number(normalized) * 100);
   return Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+}
+
+function parseOptionalPriceToCents(value) {
+  const compact = String(value || "").trim().replace(/\s/g, "");
+  if (!compact) return 0;
+  const normalized = compact.includes(",")
+    ? compact.replace(/\./g, "").replace(",", ".")
+    : compact;
+
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return 0;
+  const cents = Math.round(Number(normalized) * 100);
+  return Number.isSafeInteger(cents) && cents >= 0 ? cents : 0;
 }
 
 function applyProductQuota() {
@@ -1814,7 +1898,7 @@ async function handleSession(session) {
   } catch (error) {
     console.error(error);
     showView("restaurant");
-    showError("Não foi possível consultar o restaurante. Confira se a migration do Supabase foi executada.");
+    showError("Não foi possível consultar a loja. Confira se a migration do Supabase foi executada.");
   }
 }
 
@@ -1959,7 +2043,7 @@ deliveryCityForm.addEventListener("submit", (event) => {
 publicAddressLookup.addEventListener("click", lookupPublicAddress);
 publicAddressChangeCep.addEventListener("click", () => {
   pendingPublicAddress = null;
-  publicAddressCopy.textContent = "Informe seu CEP para verificar se o restaurante atende sua região.";
+  publicAddressCopy.textContent = "Informe seu CEP para verificar se a loja atende sua região.";
   publicAddressStepDetails.classList.add("hidden");
   publicAddressStepCep.classList.remove("hidden");
   publicAddressCep.focus();
@@ -2131,7 +2215,7 @@ settingsForm.addEventListener("submit", async (event) => {
   const restaurantName = settingsRestaurantName.value.trim();
   const menuTagline = settingsMenuTagline.value.trim();
   if (restaurantName.length < 2 || restaurantName.length > 80) {
-    settingsError.textContent = "O nome do restaurante deve ter entre 2 e 80 caracteres.";
+    settingsError.textContent = "O nome da loja deve ter entre 2 e 80 caracteres.";
     settingsError.classList.remove("hidden");
     return;
   }
@@ -2166,7 +2250,7 @@ settingsForm.addEventListener("submit", async (event) => {
     ? normalizeCustomDomain(customDomainInput.value)
     : currentRestaurant.custom_domain;
   if (normalizedCustomDomain === undefined) {
-    settingsError.textContent = "Informe apenas o domínio, por exemplo: menu.seurestaurante.com.br.";
+    settingsError.textContent = "Informe apenas o domínio, por exemplo: menu.minhaloja.com.br.";
     settingsError.classList.remove("hidden");
     return;
   }
@@ -2354,7 +2438,7 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     console.error(error);
     await deleteStoredImage(logoKey);
-    showError(error.message || "Não foi possível criar o restaurante.");
+    showError(error.message || "Não foi possível criar a loja.");
   } finally {
     setSubmitting(false);
   }

@@ -262,6 +262,11 @@ form .button-primary { margin-top: 12px; }
 .delivery-card { display: grid; gap: 16px; margin-bottom: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
 .delivery-card h2 { margin: 8px 0 7px; font: 800 25px/1.15 Manrope, sans-serif; letter-spacing: -.035em; }
 .delivery-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+.delivery-fee-form { display: grid; gap: 8px; }
+.delivery-fee-form label { font-size: 12px; font-weight: 800; }
+.delivery-fee-form div { display: grid; gap: 6px; }
+.delivery-fee-form input { width: min(220px, 100%); padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
+.delivery-fee-form small { color: var(--muted); font-size: 11px; }
 .delivery-city-form { display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 10px; align-items: end; }
 .delivery-city-form input, .delivery-city-form select { width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 11px; background: white; color: var(--ink); }
 .delivery-city-form .button, .delivery-card > .button { width: auto; }
@@ -359,6 +364,8 @@ body.address-gate-open { overflow: hidden; }
 .public-cart-summary textarea { resize: vertical; }
 .public-cart-total { display: flex; align-items: center; justify-content: space-between; margin-top: 5px; padding: 17px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .public-cart-total strong { font-size: 20px; }
+.public-cart-breakdown { display: grid; grid-template-columns: 1fr auto; row-gap: 8px; }
+.public-cart-breakdown span:not(:last-of-type), .public-cart-breakdown strong:not(:last-of-type) { color: var(--muted); font-size: 13px; font-weight: 700; }
 .public-cart-checkout, .public-cart-send { display: flex; align-items: center; justify-content: center; gap: 9px; width: 100%; padding: 15px 18px; border: 0; border-radius: 11px; color: white; font-size: 13px; font-weight: 800; }
 .public-cart-checkout { background: var(--ink); }
 .public-cart-checkout:hover { background: #34322d; }
