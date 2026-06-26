@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "NODE_ENV=development nodemon --watch server --watch functions --ext js,json --exec node server/index.js",
     "pages:dev": "npm run build && wrangler pages dev --env-file .env",
-    "build": "vite build",
+    "build": "vite build && mkdir -p dist/assets/logo && cp -R public/assets/logo/. dist/assets/logo/",
     "start": "node server/index.js"
   },
   "dependencies": {

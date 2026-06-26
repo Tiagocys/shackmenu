@@ -1,8 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
 const defaultDocumentTitle = "Shack Menu";
-const defaultMetaDescription = "Crie o cardápio digital da sua loja com o Shack Menu.";
+const defaultMetaTitle = "Shack Menu | Menu digital para vender online";
+const defaultMetaDescription = "Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual no Shack Menu.";
+const defaultMetaImage = "https://shackmenu.com/assets/logo/og.png";
+const defaultMetaUrl = "https://shackmenu.com/";
 const metaDescription = document.querySelector('meta[name="description"]');
+const canonicalLink = document.querySelector('link[rel="canonical"]');
+const openGraphTitle = document.querySelector('meta[property="og:title"]');
+const openGraphDescription = document.querySelector('meta[property="og:description"]');
+const openGraphImage = document.querySelector('meta[property="og:image"]');
+const openGraphUrl = document.querySelector('meta[property="og:url"]');
+const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+const twitterDescription = document.querySelector('meta[name="twitter:description"]');
+const twitterImage = document.querySelector('meta[name="twitter:image"]');
 
 const views = {
   loading: document.querySelector("#loading-view"),
@@ -195,7 +206,7 @@ let upgradeReturnView = "items";
 let adminReturnView = "items";
 let ordersReturnView = "items";
 let adminAccess = false;
-let planUsage = { plan: "free", product_count: 0, product_limit: 10 };
+let planUsage = { plan: "free", product_count: 0, product_limit: 200 };
 let activePublicMenu = null;
 let publicCart = [];
 let deliveryCities = [];
@@ -212,6 +223,43 @@ let notificationAudioContext = null;
 
 const pendingPublicOrderKey = "shackmenu:pending-public-order";
 
+function setMetaContent(element, content) {
+  if (element) element.content = content;
+}
+
+function setCanonicalUrl(url) {
+  if (canonicalLink) canonicalLink.href = url;
+}
+
+function updateDefaultSeoMeta() {
+  document.title = defaultDocumentTitle;
+  setMetaContent(metaDescription, defaultMetaDescription);
+  setMetaContent(openGraphTitle, defaultMetaTitle);
+  setMetaContent(openGraphDescription, defaultMetaDescription);
+  setMetaContent(openGraphImage, defaultMetaImage);
+  setMetaContent(openGraphUrl, defaultMetaUrl);
+  setMetaContent(twitterTitle, defaultMetaTitle);
+  setMetaContent(twitterDescription, defaultMetaDescription);
+  setMetaContent(twitterImage, defaultMetaImage);
+  setCanonicalUrl(defaultMetaUrl);
+}
+
+function updatePublicMenuSeoMeta(menu) {
+  const title = menu.restaurant.name;
+  const description = `${menu.restaurant.name}: menu digital com produtos, pedidos online e informações de contato.`;
+  const url = window.location.href.split("#")[0];
+  document.title = title;
+  setMetaContent(metaDescription, description);
+  setMetaContent(openGraphTitle, title);
+  setMetaContent(openGraphDescription, description);
+  setMetaContent(openGraphImage, defaultMetaImage);
+  setMetaContent(openGraphUrl, url);
+  setMetaContent(twitterTitle, title);
+  setMetaContent(twitterDescription, description);
+  setMetaContent(twitterImage, defaultMetaImage);
+  setCanonicalUrl(url);
+}
+
 function showView(name) {
   Object.entries(views).forEach(([viewName, element]) => {
     element.classList.toggle("hidden", viewName !== name);
@@ -226,8 +274,7 @@ function showView(name) {
   upgradeButton.classList.toggle("hidden", publicView || name === "restaurant" || name === "upgrade" || !currentRestaurant);
   upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
   if (name !== "publicMenu") {
-    document.title = defaultDocumentTitle;
-    if (metaDescription) metaDescription.content = defaultMetaDescription;
+    updateDefaultSeoMeta();
   }
   activeViewName = name;
 }
@@ -600,6 +647,15 @@ function formatPublicAddress(address) {
   ].filter(Boolean).join(" - ");
 }
 
+function updatePublicStickyOffsets() {
+  const addressOffset = publicAddressSummary.classList.contains("hidden")
+    ? 0
+    : publicAddressSummary.offsetHeight;
+  const categoryHeight = publicCategoryNav.offsetHeight || 0;
+  views.publicMenu.style.setProperty("--public-sticky-offset", `${addressOffset}px`);
+  views.publicMenu.style.setProperty("--public-scroll-offset", `${addressOffset + categoryHeight + 18}px`);
+}
+
 function renderPublicAddressState() {
   const canOrder = Boolean(activePublicMenu?.restaurant.whatsapp_number || activePublicMenu?.restaurant.payment_online_active || mercadoPagoTestMode);
   if (!canOrder) {
@@ -608,6 +664,7 @@ function renderPublicAddressState() {
     document.body.classList.remove("address-gate-open");
     publicMenuContent.classList.remove("menu-blurred");
     publicCategoryNav.classList.remove("menu-blurred");
+    updatePublicStickyOffsets();
     return;
   }
   const hasAddress = Boolean(publicDeliveryAddress);
@@ -625,6 +682,7 @@ function renderPublicAddressState() {
     publicAddressStepDetails.classList.add("hidden");
     publicAddressCep.focus();
   }
+  window.requestAnimationFrame(updatePublicStickyOffsets);
 }
 
 async function lookupPublicAddress() {
@@ -967,17 +1025,45 @@ function canvasToBlob(canvas, quality) {
   });
 }
 
-async function optimizeImage(file, { maxDimension, targetSize, outputName }) {
+async function optimizeImage(file, { maxDimension, targetSize, outputName, aspectRatio = null }) {
   const image = await createImageBitmap(file);
-  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.width * scale));
-  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.width;
+  let sourceHeight = image.height;
+
+  if (aspectRatio) {
+    const imageRatio = image.width / image.height;
+    if (imageRatio > aspectRatio) {
+      sourceWidth = Math.round(image.height * aspectRatio);
+      sourceX = Math.round((image.width - sourceWidth) / 2);
+    } else if (imageRatio < aspectRatio) {
+      sourceHeight = Math.round(image.width / aspectRatio);
+      sourceY = Math.round((image.height - sourceHeight) / 2);
+    }
+  }
+
+  const outputLongSide = Math.min(maxDimension, Math.max(sourceWidth, sourceHeight));
+  const scale = Math.min(1, outputLongSide / Math.max(sourceWidth, sourceHeight));
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
 
   const context = canvas.getContext("2d", { alpha: true });
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
   image.close();
 
   let blob;
@@ -1006,6 +1092,7 @@ function optimizeProductImage(file) {
     maxDimension: 1200,
     targetSize: 700 * 1024,
     outputName: "produto",
+    aspectRatio: 4 / 5,
   });
 }
 
@@ -1202,8 +1289,8 @@ async function waitForProActivation() {
     await loadPlanUsage();
     if (planUsage.plan === "pro") {
       renderUpgradePlanState();
-      upgradeMessage.textContent = "Plano Pro ativado. Seu limite agora é de 200 produtos.";
-      billingNotice.textContent = "Plano Pro ativado. Seu limite agora é de 200 produtos.";
+      upgradeMessage.textContent = "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos.";
+      billingNotice.textContent = "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos.";
       billingNotice.classList.remove("hidden");
       window.setTimeout(() => billingNotice.classList.add("hidden"), 5000);
       return;
@@ -1592,10 +1679,7 @@ function renderPublicMenu(menu) {
   loadPublicDeliveryAddress();
   loadPublicCart();
   const visibleCategories = menu.categories.filter((category) => category.products.length > 0);
-  document.title = menu.restaurant.name;
-  if (metaDescription) {
-    metaDescription.content = `${menu.restaurant.name}: cardápio digital, produtos e pedidos online.`;
-  }
+  updatePublicMenuSeoMeta(menu);
   siteHeader.classList.add("hidden");
   const backgroundColor = menu.restaurant.background_color || "#f4f1e9";
   views.publicMenu.style.setProperty("--menu-background", backgroundColor);
@@ -1702,6 +1786,7 @@ async function loadPublicMenu({ slug, domain }) {
 
   renderPublicMenu(data);
   showView("publicMenu");
+  window.requestAnimationFrame(updatePublicStickyOffsets);
 }
 
 function renderCategories() {
@@ -1805,7 +1890,7 @@ function applyProductQuota() {
 async function loadPlanUsage() {
   const { data, error } = await supabase.rpc("get_plan_usage");
   if (error) throw error;
-  planUsage = data || { plan: "free", product_count: products.length, product_limit: 10 };
+  planUsage = data || { plan: "free", product_count: products.length, product_limit: 200 };
   upgradeButton.textContent = planUsage.plan === "pro" ? "Gerenciar plano" : "Upgrade";
 }
 
@@ -1938,7 +2023,7 @@ async function init() {
     if (currentRestaurant && upgradeStatus) {
       if (upgradeStatus === "success") {
         billingNotice.textContent = planUsage.plan === "pro"
-          ? "Plano Pro ativado. Seu limite agora é de 200 produtos."
+          ? "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos."
           : "Pagamento recebido. Aguardando confirmação da Stripe...";
         billingNotice.classList.remove("hidden");
       } else {
@@ -2052,6 +2137,7 @@ publicAddressSummary.addEventListener("click", () => {
   publicDeliveryAddress = null;
   renderPublicAddressState();
 });
+window.addEventListener("resize", updatePublicStickyOffsets);
 publicAddressForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const complement = publicAddressComplement.value.trim().replace(/\s+/g, " ");
@@ -2382,7 +2468,7 @@ productImageInput.addEventListener("change", async () => {
 
   productError.classList.add("hidden");
   productUploadTitle.textContent = "Otimizando imagem...";
-  productUploadHint.textContent = "Redimensionando e convertendo para WebP";
+  productUploadHint.textContent = "Cortando em 4:5 e convertendo para WebP";
   productSubmit.disabled = true;
   productImageProcessingPromise = optimizeProductImage(file);
 
@@ -2401,7 +2487,7 @@ productImageInput.addEventListener("change", async () => {
     productImageInput.value = "";
     productImageProcessingPromise = Promise.resolve(null);
     productUploadTitle.textContent = "Escolher uma imagem";
-    productUploadHint.textContent = "JPG, PNG ou WebP, até 10 MB";
+    productUploadHint.textContent = "JPG, PNG ou WebP, até 10 MB. Cortamos em retrato 4:5 antes do envio.";
     showProductError("Não foi possível processar essa imagem. Tente outro arquivo.");
   } finally {
     if (productImageInput.files[0] === file) applyProductQuota();
@@ -2518,7 +2604,7 @@ function resetProductForm(categoryId) {
   productImagePreviewUrl = null;
   productImagePreview.innerHTML = "<strong>+</strong>";
   productUploadTitle.textContent = "Escolher uma imagem";
-  productUploadHint.textContent = "JPG, PNG ou WebP, até 10 MB. Otimizamos antes do envio.";
+  productUploadHint.textContent = "JPG, PNG ou WebP, até 10 MB. Cortamos em retrato 4:5 antes do envio.";
 }
 
 productForm.addEventListener("submit", async (event) => {
@@ -2572,7 +2658,7 @@ productForm.addEventListener("submit", async (event) => {
     console.error(error);
     await deleteStoredImage(imageKey);
     showProductError(error.message?.includes("PRODUCT_LIMIT_REACHED")
-      ? "Você atingiu o limite de produtos do seu plano."
+      ? "Você atingiu o limite máximo de produtos permitido por loja."
       : error.message || "Não foi possível adicionar o produto.");
   } finally {
     productSubmit.textContent = "Adicionar produto";

@@ -3,7 +3,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Crie o cardápio digital da sua loja com o Shack Menu." />
+  <meta name="description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual no Shack Menu." />
+  <meta name="theme-color" content="#161717" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Shack Menu" />
+  <meta property="og:title" content="Shack Menu | Menu digital para vender online" />
+  <meta property="og:description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual." />
+  <meta property="og:image" content="https://shackmenu.com/assets/logo/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://shackmenu.com/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Shack Menu | Menu digital para vender online" />
+  <meta name="twitter:description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual." />
+  <meta name="twitter:image" content="https://shackmenu.com/assets/logo/og.png" />
+  <link rel="canonical" href="https://shackmenu.com/" />
+  <link rel="icon" type="image/svg+xml" href="/assets/logo/SHACK%20LOGO.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
@@ -40,25 +55,39 @@
 
     <section id="login-view" class="auth-layout hidden">
       <div class="auth-copy">
-        <span class="eyebrow">Seu cardápio começa aqui</span>
-        <h1>Da sua cozinha para a tela dos seus clientes.</h1>
-        <p>Crie um cardápio digital bonito, fácil de atualizar e pronto para compartilhar.</p>
+        <span class="eyebrow">Menu digital para vender hoje</span>
+        <h1>Crie o cardápio online da sua loja em menos de 10 minutos.</h1>
+        <p>O Shack Menu ajuda pequenos lojistas a publicar produtos, receber pedidos e vender com pagamento online sem depender de aplicativo próprio.</p>
+        <div class="auth-highlights">
+          <article>
+            <strong>&lt; 10 min</strong>
+            <span>Nome, logo, categorias e produtos no ar rapidamente.</span>
+          </article>
+          <article>
+            <strong>12% no Free</strong>
+            <span>Checkout online com taxa pequena por pedido pago. No Pro, taxa Shack Menu zero.</span>
+          </article>
+          <article>
+            <strong>/sua-loja</strong>
+            <span>Link personalizado para divulgar no Instagram, WhatsApp, balcão e embalagens.</span>
+          </article>
+        </div>
         <ul class="benefits">
-          <li><span>01</span> Publique sem depender de código</li>
-          <li><span>02</span> Atualize preços e itens em minutos</li>
-          <li><span>03</span> Compartilhe por link ou QR Code</li>
+          <li><span>01</span> Comece grátis, com produtos liberados como no Pro</li>
+          <li><span>02</span> Receba pedidos pelo cardápio e acompanhe no painel</li>
+          <li><span>03</span> Personalize visual, logo, WhatsApp, Instagram e taxa de entrega</li>
         </ul>
       </div>
 
       <div class="auth-card">
         <div class="card-icon">S</div>
-        <h2>Entre no Shack Menu</h2>
-        <p>Use sua conta Google para começar ou continuar seu cardápio.</p>
+        <h2>Comece sua loja digital</h2>
+        <p>Use sua conta Google para criar ou continuar seu menu.</p>
         <button id="google-login" class="button button-google" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285f4" d="M21.6 12.2c0-.7-.1-1.5-.2-2.2H12v4.3h5.4a4.6 4.6 0 0 1-2 3v2.8h3.5c2-1.9 3.2-4.6 3.2-7.9Z"/><path fill="#34a853" d="M12 22c2.9 0 5.3-1 7-2.6l-3.5-2.8c-1 .7-2.2 1-3.5 1a6.2 6.2 0 0 1-5.8-4.3H2.6v2.8A10.6 10.6 0 0 0 12 22Z"/><path fill="#fbbc05" d="M6.2 13.3a6.4 6.4 0 0 1 0-4V6.5H2.6a10.6 10.6 0 0 0 0 9.6l3.6-2.8Z"/><path fill="#ea4335" d="M12 4.9c1.6 0 3 .5 4.1 1.6l3.1-3A10.4 10.4 0 0 0 2.6 6.4l3.6 2.8A6.2 6.2 0 0 1 12 5Z"/></svg>
           Continuar com Google
         </button>
-        <small>Ao continuar, você concorda com os <a href="#terms" data-open-terms>Termos de Uso</a> e a Política de Privacidade.</small>
+        <small>Você pode publicar gratuitamente e pagar taxa Shack Menu apenas quando usar checkout online no plano Free. Ao continuar, você concorda com os <a href="#terms" data-open-terms>Termos de Uso</a> e a Política de Privacidade.</small>
       </div>
     </section>
 
@@ -164,8 +193,8 @@
 
         <form id="product-form" class="product-form">
           <div id="product-quota-warning" class="quota-warning hidden">
-            <div><strong>Limite do plano atingido</strong><p>O plano gratuito permite até 10 produtos.</p></div>
-            <button id="quota-upgrade" class="button button-upgrade" type="button">Conhecer o Pro</button>
+            <div><strong>Limite técnico atingido</strong><p>Você atingiu o limite máximo de produtos permitido por loja.</p></div>
+            <button id="quota-upgrade" class="button button-upgrade hidden" type="button">Conhecer o Pro</button>
           </div>
           <div class="product-fields-row">
             <div class="field-group field-grow">
@@ -193,7 +222,7 @@
             <label class="logo-upload product-upload" for="product-image">
               <input id="product-image" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
               <span id="product-image-preview" class="logo-preview product-image-preview"><strong>+</strong></span>
-              <span class="upload-copy"><strong id="product-upload-title">Escolher uma imagem</strong><small id="product-upload-hint">JPG, PNG ou WebP, até 10 MB. Otimizamos antes do envio.</small></span>
+              <span class="upload-copy"><strong id="product-upload-title">Escolher uma imagem</strong><small id="product-upload-hint">JPG, PNG ou WebP, até 10 MB. Cortamos em retrato 4:5 antes do envio.</small></span>
             </label>
           </div>
 
@@ -344,7 +373,7 @@
           <button id="upgrade-back" class="button button-ghost" type="button">← Voltar</button>
           <span class="eyebrow">Planos Shack Menu</span>
           <h1>Comece grátis. Cresça com o Pro.</h1>
-          <p>Escolha o plano adequado ao tamanho do seu cardápio.</p>
+          <p>O plano gratuito já permite montar uma loja completa. O Pro remove a taxa Shack Menu do checkout e libera recursos profissionais.</p>
         </div>
 
         <p id="upgrade-message" class="form-success hidden" role="status"></p>
@@ -357,7 +386,7 @@
             <p>Para começar seu cardápio digital.</p>
             <ul class="pricing-features">
               <li>1 loja por conta</li>
-              <li>Até 10 produtos</li>
+              <li>Mesmo limite de produtos do Pro</li>
               <li>Categorias ilimitadas</li>
               <li>Cor, logo e visual personalizáveis</li>
               <li>Botão de WhatsApp</li>
@@ -372,10 +401,9 @@
             <span class="pricing-badge">Recomendado</span>
             <span class="pricing-label">Pro</span>
             <h2>R$ 49,90 <small>/ mês</small></h2>
-            <p>Mais capacidade e ferramentas de venda.</p>
+            <p>Para vender mais com menos taxa e mais controle de marca.</p>
             <ul class="pricing-features">
               <li>Tudo do plano gratuito</li>
-              <li>Até 200 produtos</li>
               <li>Sem a marca “Feito com Shack Menu”</li>
               <li>Domínio próprio com SSL</li>
               <li>Pedidos pelo cardápio</li>
@@ -400,7 +428,7 @@
         <article class="legal-card">
           <h2>Planos</h2>
           <p><strong>Plano gratuito:</strong> permite criar e publicar um cardápio digital com os recursos básicos do Shack Menu. Quando a loja usa checkout online pelo Mercado Pago, o Shack Menu cobra uma taxa de plataforma de <strong>12% sobre pedidos pagos</strong>.</p>
-          <p><strong>Plano Pro:</strong> remove a taxa Shack Menu por pedido pago e libera recursos adicionais, como maior limite de produtos, domínio próprio e remoção da marca Shack Menu no cardápio público.</p>
+          <p><strong>Plano Pro:</strong> remove a taxa Shack Menu por pedido pago e libera recursos adicionais, como domínio próprio e remoção da marca Shack Menu no cardápio público.</p>
         </article>
 
         <article class="legal-card">
