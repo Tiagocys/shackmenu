@@ -10,6 +10,8 @@ const canonicalLink = document.querySelector('link[rel="canonical"]');
 const openGraphTitle = document.querySelector('meta[property="og:title"]');
 const openGraphDescription = document.querySelector('meta[property="og:description"]');
 const openGraphImage = document.querySelector('meta[property="og:image"]');
+const openGraphImageWidth = document.querySelector('meta[property="og:image:width"]');
+const openGraphImageHeight = document.querySelector('meta[property="og:image:height"]');
 const openGraphUrl = document.querySelector('meta[property="og:url"]');
 const twitterTitle = document.querySelector('meta[name="twitter:title"]');
 const twitterDescription = document.querySelector('meta[name="twitter:description"]');
@@ -237,6 +239,8 @@ function updateDefaultSeoMeta() {
   setMetaContent(openGraphTitle, defaultMetaTitle);
   setMetaContent(openGraphDescription, defaultMetaDescription);
   setMetaContent(openGraphImage, defaultMetaImage);
+  setMetaContent(openGraphImageWidth, "1200");
+  setMetaContent(openGraphImageHeight, "630");
   setMetaContent(openGraphUrl, defaultMetaUrl);
   setMetaContent(twitterTitle, defaultMetaTitle);
   setMetaContent(twitterDescription, defaultMetaDescription);
@@ -246,17 +250,24 @@ function updateDefaultSeoMeta() {
 
 function updatePublicMenuSeoMeta(menu) {
   const title = menu.restaurant.name;
-  const description = `${menu.restaurant.name}: menu digital com produtos, pedidos online e informações de contato.`;
+  const description = menu.restaurant.menu_tagline
+    || `${menu.restaurant.name}: menu digital com produtos, pedidos online e informações de contato.`;
+  const hasLogo = Boolean(menu.restaurant.logo_key);
+  const image = hasLogo
+    ? `${window.location.origin}/api/media?key=${encodeURIComponent(menu.restaurant.logo_key)}`
+    : defaultMetaImage;
   const url = window.location.href.split("#")[0];
   document.title = title;
   setMetaContent(metaDescription, description);
   setMetaContent(openGraphTitle, title);
   setMetaContent(openGraphDescription, description);
-  setMetaContent(openGraphImage, defaultMetaImage);
+  setMetaContent(openGraphImage, image);
+  setMetaContent(openGraphImageWidth, hasLogo ? "512" : "1200");
+  setMetaContent(openGraphImageHeight, hasLogo ? "512" : "630");
   setMetaContent(openGraphUrl, url);
   setMetaContent(twitterTitle, title);
   setMetaContent(twitterDescription, description);
-  setMetaContent(twitterImage, defaultMetaImage);
+  setMetaContent(twitterImage, image);
   setCanonicalUrl(url);
 }
 
