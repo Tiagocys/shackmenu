@@ -27,6 +27,16 @@ function isPlatformHost(hostname) {
   return platformHosts.has(hostname) || hostname.endsWith(".pages.dev") || hostname === "localhost" || hostname === "127.0.0.1";
 }
 
+function publicRequestUrl(request) {
+  const internalUrl = new URL(request.url);
+  const host = request.headers.get("x-forwarded-host")
+    || request.headers.get("host")
+    || internalUrl.host;
+  const protocol = request.headers.get("x-forwarded-proto")
+    || (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? internalUrl.protocol.replace(":", "") : "https");
+  return new URL(`${internalUrl.pathname}${internalUrl.search}`, `${protocol}://${host}`);
+}
+
 function getMenuLookup(url) {
   const hostname = url.hostname.toLowerCase();
   const slugMatch = url.pathname.match(/^\/m\/([^/]+)\/?$/);
@@ -129,7 +139,7 @@ function injectSeo(html, seo) {
 export async function onRequest(context) {
   if (context.request.method !== "GET") return context.next();
 
-  const url = new URL(context.request.url);
+  const url = publicRequestUrl(context.request);
   const lookup = getMenuLookup(url);
   if (!lookup) return context.next();
 
