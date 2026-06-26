@@ -1420,7 +1420,7 @@ function renderSharePanel() {
 
   if (!isPublished) return;
   const url = currentRestaurant.custom_domain && currentRestaurant.custom_domain_status === "active"
-    ? `https://${currentRestaurant.custom_domain}`
+    ? `https://${currentRestaurant.custom_domain}/m/${currentRestaurant.slug}`
     : `${window.location.origin}/m/${currentRestaurant.slug}`;
   publicMenuUrl.value = url;
   openPublicMenu.href = url;

@@ -46,9 +46,16 @@ function forwardedProtocol(request, host, internalUrl) {
     || (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? internalUrl.protocol.replace(":", "") : "https");
 }
 
+function hostMetadataDomain(request) {
+  const metadata = request.cf?.hostMetadata;
+  if (!metadata || typeof metadata !== "object") return null;
+  const domain = metadata.domain || metadata.custom_domain || metadata.hostname;
+  return typeof domain === "string" && domain.includes(".") ? domain.toLowerCase() : null;
+}
+
 function publicRequestUrl(request) {
   const internalUrl = new URL(request.url);
-  const host = forwardedHost(request) || internalUrl.host;
+  const host = hostMetadataDomain(request) || forwardedHost(request) || internalUrl.host;
   const protocol = forwardedProtocol(request, host, internalUrl);
   return new URL(`${internalUrl.pathname}${internalUrl.search}`, `${protocol}://${host}`);
 }
@@ -170,6 +177,7 @@ export async function onRequest(context) {
         xOriginalHost: context.request.headers.get("x-original-host"),
         xHost: context.request.headers.get("x-host"),
       },
+      cfHostMetadata: context.request.cf?.hostMetadata || null,
     });
   }
   if (!lookup) return context.next();
