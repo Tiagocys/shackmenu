@@ -27,13 +27,29 @@ function isPlatformHost(hostname) {
   return platformHosts.has(hostname) || hostname.endsWith(".pages.dev") || hostname === "localhost" || hostname === "127.0.0.1";
 }
 
+function forwardedHost(request) {
+  const forwarded = request.headers.get("forwarded") || "";
+  const forwardedHost = forwarded.match(/host="?([^";,]+)"?/i)?.[1];
+  return request.headers.get("x-forwarded-host")
+    || request.headers.get("x-original-host")
+    || request.headers.get("x-host")
+    || forwardedHost
+    || request.headers.get("host")
+    || null;
+}
+
+function forwardedProtocol(request, host, internalUrl) {
+  const forwarded = request.headers.get("forwarded") || "";
+  const forwardedProto = forwarded.match(/proto="?([^";,]+)"?/i)?.[1];
+  return request.headers.get("x-forwarded-proto")
+    || forwardedProto
+    || (host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? internalUrl.protocol.replace(":", "") : "https");
+}
+
 function publicRequestUrl(request) {
   const internalUrl = new URL(request.url);
-  const host = request.headers.get("x-forwarded-host")
-    || request.headers.get("host")
-    || internalUrl.host;
-  const protocol = request.headers.get("x-forwarded-proto")
-    || (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? internalUrl.protocol.replace(":", "") : "https");
+  const host = forwardedHost(request) || internalUrl.host;
+  const protocol = forwardedProtocol(request, host, internalUrl);
   return new URL(`${internalUrl.pathname}${internalUrl.search}`, `${protocol}://${host}`);
 }
 
@@ -141,6 +157,21 @@ export async function onRequest(context) {
 
   const url = publicRequestUrl(context.request);
   const lookup = getMenuLookup(url);
+  if (url.searchParams.get("debug-host") === "1") {
+    return Response.json({
+      requestUrl: context.request.url,
+      publicUrl: url.href,
+      lookup,
+      headers: {
+        host: context.request.headers.get("host"),
+        forwarded: context.request.headers.get("forwarded"),
+        xForwardedHost: context.request.headers.get("x-forwarded-host"),
+        xForwardedProto: context.request.headers.get("x-forwarded-proto"),
+        xOriginalHost: context.request.headers.get("x-original-host"),
+        xHost: context.request.headers.get("x-host"),
+      },
+    });
+  }
   if (!lookup) return context.next();
 
   const response = await context.next();
