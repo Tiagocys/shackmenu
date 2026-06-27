@@ -145,12 +145,15 @@ function injectSeo(html, seo) {
 
   let next = html.replace(/<title>.*?<\/title>/s, `<title>${title}</title>`);
   next = replaceOrInsertMeta(next, /<meta\s+name="description"[^>]*>/i, `<meta name="description" content="${description}" />`);
+  next = replaceOrInsertMeta(next, /<meta\s+property="og:type"[^>]*>/i, '<meta property="og:type" content="website" />');
+  next = replaceOrInsertMeta(next, /<meta\s+property="og:site_name"[^>]*>/i, '<meta property="og:site_name" content="Shack Menu" />');
   next = replaceOrInsertMeta(next, /<meta\s+property="og:title"[^>]*>/i, `<meta property="og:title" content="${title}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+property="og:description"[^>]*>/i, `<meta property="og:description" content="${description}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+property="og:image"[^>]*>/i, `<meta property="og:image" content="${image}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+property="og:image:width"[^>]*>/i, `<meta property="og:image:width" content="${imageWidth}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+property="og:image:height"[^>]*>/i, `<meta property="og:image:height" content="${imageHeight}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+property="og:url"[^>]*>/i, `<meta property="og:url" content="${url}" />`);
+  next = replaceOrInsertMeta(next, /<meta\s+name="twitter:card"[^>]*>/i, '<meta name="twitter:card" content="summary_large_image" />');
   next = replaceOrInsertMeta(next, /<meta\s+name="twitter:title"[^>]*>/i, `<meta name="twitter:title" content="${title}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+name="twitter:description"[^>]*>/i, `<meta name="twitter:description" content="${description}" />`);
   next = replaceOrInsertMeta(next, /<meta\s+name="twitter:image"[^>]*>/i, `<meta name="twitter:image" content="${image}" />`);

@@ -81,6 +81,7 @@ const finishMenu = document.querySelector("#finish-menu");
 const publishMenu = document.querySelector("#publish-menu");
 const publishError = document.querySelector("#publish-error");
 const sharePanel = document.querySelector("#share-panel");
+const publicMenuSlug = document.querySelector("#public-menu-slug");
 const publicMenuUrl = document.querySelector("#public-menu-url");
 const copyMenuUrl = document.querySelector("#copy-menu-url");
 const openPublicMenu = document.querySelector("#open-public-menu");
@@ -1422,6 +1423,7 @@ function renderSharePanel() {
   const url = currentRestaurant.custom_domain && currentRestaurant.custom_domain_status === "active"
     ? `https://${currentRestaurant.custom_domain}/m/${currentRestaurant.slug}`
     : `${window.location.origin}/m/${currentRestaurant.slug}`;
+  publicMenuSlug.textContent = `/m/${currentRestaurant.slug}`;
   publicMenuUrl.value = url;
   openPublicMenu.href = url;
 }

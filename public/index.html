@@ -5,18 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual no Shack Menu." />
   <meta name="theme-color" content="#161717" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Shack Menu" />
-  <meta property="og:title" content="Shack Menu | Menu digital para vender online" />
-  <meta property="og:description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual." />
-  <meta property="og:image" content="https://shackmenu.com/assets/logo/og.png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:url" content="https://shackmenu.com/" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Shack Menu | Menu digital para vender online" />
-  <meta name="twitter:description" content="Crie um menu digital para sua loja em poucos minutos com pedidos online, pagamento via Mercado Pago, link personalizado e personalização visual." />
-  <meta name="twitter:image" content="https://shackmenu.com/assets/logo/og.png" />
   <link rel="canonical" href="https://shackmenu.com/" />
   <link rel="icon" type="image/svg+xml" href="/assets/logo/SHACK%20LOGO.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -254,6 +242,11 @@
         <button id="publish-menu" class="button button-primary" type="button">Publicar cardápio</button>
         <div id="share-panel" class="share-panel hidden">
           <label for="public-menu-url">Link público</label>
+          <div class="share-slug">
+            <span>Slug de compartilhamento</span>
+            <strong id="public-menu-slug">/m/sua-loja</strong>
+          </div>
+          <small>Use este link com <strong>/m/slug</strong> para WhatsApp, Google e redes sociais lerem a logo, título e descrição da loja corretamente.</small>
           <div class="share-row">
             <input id="public-menu-url" type="text" readonly />
             <button id="copy-menu-url" class="button button-copy" type="button">Copiar</button>
