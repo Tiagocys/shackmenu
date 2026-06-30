@@ -167,22 +167,6 @@ export async function onRequest(context) {
 
   const url = publicRequestUrl(context.request);
   const lookup = getMenuLookup(url);
-  if (url.searchParams.get("debug-host") === "1") {
-    return Response.json({
-      requestUrl: context.request.url,
-      publicUrl: url.href,
-      lookup,
-      headers: {
-        host: context.request.headers.get("host"),
-        forwarded: context.request.headers.get("forwarded"),
-        xForwardedHost: context.request.headers.get("x-forwarded-host"),
-        xForwardedProto: context.request.headers.get("x-forwarded-proto"),
-        xOriginalHost: context.request.headers.get("x-original-host"),
-        xHost: context.request.headers.get("x-host"),
-      },
-      cfHostMetadata: context.request.cf?.hostMetadata || null,
-    });
-  }
   if (!lookup) return context.next();
 
   const response = await context.next();
