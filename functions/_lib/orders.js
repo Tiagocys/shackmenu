@@ -19,13 +19,6 @@ function normalizeCpf(value) {
   return digits.length === 11 ? digits : null;
 }
 
-function getApplicationFeePercent(isPro, env) {
-  if (isPro) return 0;
-  const configured = Number(env.ORDER_PLATFORM_FEE_PERCENT || 12);
-  if (!Number.isFinite(configured)) return 12;
-  return Math.min(20, Math.max(0, Math.round(configured)));
-}
-
 function getOrderReturnUrl(returnUrl, fallbackOrigin, slug, status) {
   const url = new URL(returnUrl || `/m/${slug}`, fallbackOrigin);
   url.searchParams.set("order", status);
@@ -47,14 +40,6 @@ async function getActiveProducts(env, restaurantId, ids) {
     env,
     `rest/v1/products?select=id,name,price_cents&active=eq.true&restaurant_id=eq.${encodeURIComponent(restaurantId)}&id=in.(${uniqueIds.map(encodeURIComponent).join(",")})`,
   );
-}
-
-async function isOwnerPro(env, ownerId) {
-  const records = await supabaseAdminRequest(
-    env,
-    `rest/v1/subscriptions?select=status&owner_id=eq.${encodeURIComponent(ownerId)}&status=in.(active,trialing)&limit=1`,
-  );
-  return records.length > 0;
 }
 
 async function getActivePaymentSettings(env, restaurantId) {
@@ -103,8 +88,7 @@ async function createOrderRecord(env, body) {
     complement: body.deliveryComplement,
   });
 
-  const isPro = await isOwnerPro(env, restaurant.owner_id);
-  const feePercent = getApplicationFeePercent(isPro, env);
+  const feePercent = 0;
   const platformFee = Math.round((payableTotal * feePercent) / 100);
 
   const orderRows = await supabaseAdminRequest(env, "rest/v1/orders", {

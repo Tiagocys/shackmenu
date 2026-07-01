@@ -519,14 +519,12 @@ function renderConnectStatus(payment = {}) {
   connectOnboarding.classList.remove("hidden");
   const status = payment.status || "not_started";
   const active = status === "active" && payment.chargesEnabled;
-  const isPro = planUsage.plan === "pro";
-  const checkoutFee = isPro ? "0%" : "12%";
   connectCard.classList.toggle("connect-card-active", active);
   connectCard.classList.toggle("connect-card-pending", !active);
   connectTitle.textContent = active ? "Pagamento online ativo" : payment.label || "Onboarding pendente";
   connectCopy.textContent = active
-    ? `Seu cardápio recebe Pix, cartão e outros meios via Mercado Pago. Taxa Shack Menu no checkout: ${checkoutFee}. ${isPro ? "Plano Pro ativo: sem taxa Shack Menu." : "Assine o Pro para remover essa taxa."}`
-    : `Conecte a conta Mercado Pago para liberar pagamento online. No plano gratuito, a taxa Shack Menu é de ${checkoutFee} por pagamento confirmado. O plano Pro remove essa taxa.`;
+    ? "Sua loja recebe Pix, cartão e outros meios via Mercado Pago. O Shack Menu não cobra taxa por pedido pago."
+    : "Conecte a conta Mercado Pago para liberar pagamento online. O Shack Menu não cobra taxa por pedido pago; permanecem apenas as tarifas do Mercado Pago.";
   connectOnboarding.textContent = active ? "Reconectar Mercado Pago" : "Conectar Mercado Pago";
 }
 
@@ -759,7 +757,7 @@ function canRefundOrder(order) {
 
 async function refundOrder(order, button) {
   const confirmed = window.confirm(
-    `Reembolsar integralmente o pedido #${order.order_number}? Esta ação será enviada ao Mercado Pago.`,
+    `Cancelar o pedido #${order.order_number}? O cliente será reembolsado integralmente pelo Mercado Pago.`,
   );
   if (!confirmed) return;
 
@@ -767,7 +765,7 @@ async function refundOrder(order, button) {
   ordersSuccess.classList.add("hidden");
   button.disabled = true;
   const originalText = button.textContent;
-  button.textContent = "Reembolsando...";
+  button.textContent = "Cancelando...";
   try {
     await authenticatedApi("/api/orders/refund", {
       method: "POST",
@@ -861,11 +859,12 @@ function renderOrders(orders) {
     deliveryFeeLine.textContent = `Entrega ${deliveryFeeValue > 0 ? formatPrice(deliveryFeeValue) : "grátis"}`;
     const total = document.createElement("span");
     total.textContent = `Total ${formatPrice(totalCents)}`;
-    const fee = document.createElement("span");
-    fee.textContent = order.platform_fee_percent > 0
-      ? `Taxa Shack Menu ${order.platform_fee_percent}%: ${formatPrice(order.platform_fee_cents)}`
-      : "Sem taxa Shack Menu";
-    totals.append(subtotal, deliveryFeeLine, total, fee);
+    totals.append(subtotal, deliveryFeeLine, total);
+    if (order.platform_fee_percent > 0) {
+      const fee = document.createElement("span");
+      fee.textContent = `Taxa Shack Menu ${order.platform_fee_percent}%: ${formatPrice(order.platform_fee_cents)}`;
+      totals.append(fee);
+    }
 
     const actions = document.createElement("div");
     actions.className = "order-actions";
@@ -873,9 +872,12 @@ function renderOrders(orders) {
       const refundButton = document.createElement("button");
       refundButton.type = "button";
       refundButton.className = "button-secondary button-danger";
-      refundButton.textContent = "Reembolsar integralmente";
+      refundButton.textContent = "Cancelar pedido";
       refundButton.addEventListener("click", () => refundOrder(order, refundButton));
-      actions.append(refundButton);
+      const refundNote = document.createElement("small");
+      refundNote.className = "order-action-note";
+      refundNote.textContent = "Ao cancelar, o cliente será reembolsado integralmente.";
+      actions.append(refundButton, refundNote);
     }
 
     if (order.notes) {
@@ -1301,8 +1303,8 @@ async function waitForProActivation() {
     await loadPlanUsage();
     if (planUsage.plan === "pro") {
       renderUpgradePlanState();
-      upgradeMessage.textContent = "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos.";
-      billingNotice.textContent = "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos.";
+      upgradeMessage.textContent = "Plano Pro ativado. Recursos profissionais liberados.";
+      billingNotice.textContent = "Plano Pro ativado. Recursos profissionais liberados.";
       billingNotice.classList.remove("hidden");
       window.setTimeout(() => billingNotice.classList.add("hidden"), 5000);
       return;
@@ -2036,7 +2038,7 @@ async function init() {
     if (currentRestaurant && upgradeStatus) {
       if (upgradeStatus === "success") {
         billingNotice.textContent = planUsage.plan === "pro"
-          ? "Plano Pro ativado. A taxa Shack Menu foi removida dos pedidos pagos."
+          ? "Plano Pro ativado. Recursos profissionais liberados."
           : "Pagamento recebido. Aguardando confirmação da Stripe...";
         billingNotice.classList.remove("hidden");
       } else {

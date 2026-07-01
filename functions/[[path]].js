@@ -68,6 +68,19 @@ function getMenuLookup(url) {
   return null;
 }
 
+function getPlatformSeo(url) {
+  const hostname = url.hostname.toLowerCase();
+  const platformRoot = (hostname === "shackmenu.com" || hostname === "www.shackmenu.com")
+    && (url.pathname === "/" || url.pathname === "");
+  if (!platformRoot) return null;
+  return {
+    ...defaultSeo,
+    url: publicUrl(url),
+    imageWidth: 1200,
+    imageHeight: 630,
+  };
+}
+
 function publicOrigin(url) {
   const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
   return `${local ? url.protocol : "https:"}//${url.host}`;
@@ -167,14 +180,15 @@ export async function onRequest(context) {
 
   const url = publicRequestUrl(context.request);
   const lookup = getMenuLookup(url);
-  if (!lookup) return context.next();
+  const platformSeo = getPlatformSeo(url);
+  if (!lookup && !platformSeo) return context.next();
 
   const response = await context.next();
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("text/html")) return response;
 
-  const menu = await fetchPublicMenu(context.env, lookup);
-  const seo = menuSeo(menu, url);
+  const menu = lookup ? await fetchPublicMenu(context.env, lookup) : null;
+  const seo = platformSeo || menuSeo(menu, url);
   if (!seo) return response;
 
   const html = await response.text();

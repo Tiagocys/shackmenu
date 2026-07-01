@@ -138,7 +138,7 @@ function buildMerchantEmail(order) {
     `Subtotal: ${formatPrice(order.subtotal_cents)}`,
     getDeliveryFee(order) > 0 ? `Entrega: ${formatPrice(getDeliveryFee(order))}` : "Entrega: grátis",
     `Total: ${formatPrice(getOrderTotal(order))}`,
-    order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "Sem taxa Shack Menu",
+    order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "",
     order.notes ? `Observações: ${order.notes}` : "",
   ].filter(Boolean).join("\n");
 
@@ -152,7 +152,7 @@ function buildMerchantEmail(order) {
         <p style="font-size:14px;margin:0 0 6px;text-align:right;color:#7a6d5d;">Subtotal: ${formatPrice(order.subtotal_cents)}</p>
         <p style="font-size:14px;margin:0 0 8px;text-align:right;color:#7a6d5d;">Entrega: ${getDeliveryFee(order) > 0 ? formatPrice(getDeliveryFee(order)) : "grátis"}</p>
         <p style="font-size:18px;margin:0 0 8px;text-align:right;"><strong>Total: ${formatPrice(getOrderTotal(order))}</strong></p>
-        <p style="margin:0 0 20px;text-align:right;color:#7a6d5d;">${order.platform_fee_percent > 0 ? `Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}` : "Sem taxa Shack Menu"}</p>
+        ${order.platform_fee_percent > 0 ? `<p style="margin:0 0 20px;text-align:right;color:#7a6d5d;">Taxa Shack Menu (${order.platform_fee_percent}%): ${formatPrice(order.platform_fee_cents)}</p>` : ""}
         ${order.notes ? `<p style="background:#f6f2ea;border-radius:12px;padding:14px;"><strong>Observações:</strong><br>${escapeHtml(order.notes)}</p>` : ""}
       </div>
     </div>
