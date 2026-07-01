@@ -286,6 +286,7 @@ form .button-primary { margin-top: 12px; }
 .connect-card h2 { margin: 8px 0 7px; font: 800 25px/1.15 Manrope, sans-serif; letter-spacing: -.035em; }
 .connect-card p { margin: 0; color: #77630e; line-height: 1.5; }
 .connect-card .button { width: auto; min-width: 220px; }
+.connect-actions { display: grid; gap: 10px; justify-items: end; }
 .connect-card-active { border-color: #b9cf82; background: #eff9cf; }
 .connect-card-active p { color: #41610e; }
 .connect-card-pending { border-color: #e4c347; }
@@ -433,7 +434,8 @@ body.cart-open { overflow: hidden; }
   .delivery-city-form { grid-template-columns: 1fr; }
   .delivery-city-form .button, .delivery-card > .button { width: 100%; }
   .connect-card { grid-template-columns: 1fr; }
-  .connect-card .button { width: 100%; min-width: 0; }
+  .connect-actions { justify-items: stretch; }
+  .connect-card .button, .connect-card .button-secondary { width: 100%; min-width: 0; }
   .order-card-header, .order-totals { align-items: flex-start; flex-direction: column; }
   .menu-hero { padding: 44px 24px; }
   .public-restaurant-logo { width: 72px; height: 72px; border-radius: 18px; }

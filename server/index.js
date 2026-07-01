@@ -34,6 +34,7 @@ import {
   refundMercadoPagoOrder,
 } from "../functions/_lib/orders.js";
 import {
+  disconnectOwnerMercadoPagoAccount,
   getMercadoPagoPaymentForOrder,
   completeMercadoPagoOnboarding,
   createMercadoPagoOnboardingUrl,
@@ -332,6 +333,18 @@ app.post("/api/connect/onboarding", authenticate, async (request, response) => {
   } catch (error) {
     console.error("Could not create Mercado Pago onboarding", error);
     return response.status(500).json({ error: error.message || "Não foi possível comunicar com o Mercado Pago." });
+  }
+});
+
+app.post("/api/connect/disconnect", authenticate, async (request, response) => {
+  try {
+    const restaurant = await getOwnerRestaurant(process.env, request.user.id);
+    if (!restaurant) return response.status(404).json({ error: "Loja não encontrada." });
+    const account = await disconnectOwnerMercadoPagoAccount(process.env, request.user.id);
+    return response.json({ payment: publicMercadoPagoStatus(account) });
+  } catch (error) {
+    console.error("Could not disconnect Mercado Pago", error);
+    return response.status(500).json({ error: "Não foi possível desconectar o Mercado Pago." });
   }
 });
 

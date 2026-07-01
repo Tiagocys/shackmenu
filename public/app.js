@@ -181,6 +181,7 @@ const connectCard = document.querySelector("#connect-card");
 const connectTitle = document.querySelector("#connect-title");
 const connectCopy = document.querySelector("#connect-copy");
 const connectOnboarding = document.querySelector("#connect-onboarding");
+const connectDisconnect = document.querySelector("#connect-disconnect");
 const ordersList = document.querySelector("#orders-list");
 const ordersCount = document.querySelector("#orders-count");
 const ordersNotice = document.querySelector("#orders-notice");
@@ -526,6 +527,7 @@ function renderConnectStatus(payment = {}) {
     ? "Sua loja recebe Pix, cartão e outros meios via Mercado Pago. O Shack Menu não cobra taxa por pedido pago."
     : "Conecte a conta Mercado Pago para liberar pagamento online. O Shack Menu não cobra taxa por pedido pago; permanecem apenas as tarifas do Mercado Pago.";
   connectOnboarding.textContent = active ? "Reconectar Mercado Pago" : "Conectar Mercado Pago";
+  connectDisconnect.classList.toggle("hidden", !active);
 }
 
 function renderDeliveryCities() {
@@ -2184,6 +2186,32 @@ connectOnboarding.addEventListener("click", async () => {
     ordersError.classList.remove("hidden");
     connectOnboarding.disabled = false;
     connectOnboarding.textContent = "Conectar Mercado Pago";
+  }
+});
+
+connectDisconnect.addEventListener("click", async () => {
+  const confirmed = window.confirm(
+    "Desconectar a conta Mercado Pago desta loja? O checkout online ficará indisponível até uma nova conexão.",
+  );
+  if (!confirmed) return;
+
+  ordersError.classList.add("hidden");
+  ordersSuccess.classList.add("hidden");
+  connectDisconnect.disabled = true;
+  connectDisconnect.textContent = "Desconectando...";
+  try {
+    const result = await authenticatedApi("/api/connect/disconnect", { method: "POST" });
+    renderConnectStatus(result.payment);
+    ordersSuccess.textContent = "Conta Mercado Pago desconectada. O checkout online foi desativado.";
+    ordersSuccess.classList.remove("hidden");
+    await loadOrders();
+  } catch (error) {
+    console.error(error);
+    ordersError.textContent = error.message;
+    ordersError.classList.remove("hidden");
+  } finally {
+    connectDisconnect.disabled = false;
+    connectDisconnect.textContent = "Desconectar conta";
   }
 });
 

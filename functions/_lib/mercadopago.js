@@ -205,6 +205,28 @@ export async function getOwnerMercadoPagoAccount(env, ownerId) {
   return rows[0] || null;
 }
 
+export async function disconnectOwnerMercadoPagoAccount(env, ownerId) {
+  const rows = await supabaseAdminRequest(
+    env,
+    `rest/v1/restaurant_mercado_pago_accounts?owner_id=eq.${encodeURIComponent(ownerId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        public_key: null,
+        access_token: "",
+        refresh_token: null,
+        token_type: null,
+        scope: null,
+        status: "revoked",
+        expires_at: null,
+        last_synced_at: new Date().toISOString(),
+      }),
+    },
+  );
+  return rows[0] || null;
+}
+
 async function getValidMercadoPagoAccount(env, restaurantId) {
   const account = await getMercadoPagoAccount(env, restaurantId);
   if (!account || account.status !== "active") throw new Error("Mercado Pago não conectado.");
@@ -283,7 +305,7 @@ export async function completeMercadoPagoOnboarding(env, { code, state, origin }
 }
 
 export function publicMercadoPagoStatus(account) {
-  if (!account) {
+  if (!account || account.status === "revoked") {
     return {
       status: "not_started",
       label: "Mercado Pago não conectado",
